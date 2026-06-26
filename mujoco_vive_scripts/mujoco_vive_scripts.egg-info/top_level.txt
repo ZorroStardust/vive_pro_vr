@@ -1,1 +1,0 @@
-mujoco_vive_scripts

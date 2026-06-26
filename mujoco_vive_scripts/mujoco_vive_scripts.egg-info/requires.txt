@@ -1,8 +1,0 @@
-mujoco>=3.1.0
-numpy>=1.24
-Pillow>=10.0
-
-[openxr]
-pyopenxr>=1.0.0
-PyOpenGL>=3.1.7
-glfw>=2.7.0
