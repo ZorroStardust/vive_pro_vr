@@ -28,7 +28,6 @@ from .xr_mujoco_opengl_comfort import (  # noqa: E402
     _handle_input,
     RuntimeComfortState,
     HINT,
-    clear_eye,
     check_openxr,
 )
 
@@ -43,7 +42,6 @@ from .config_util import (  # noqa: E402
 
 from teleop_core.scene import MujocoScene  # noqa: E402
 from teleop_core.config import (  # noqa: E402
-    AppConfig,
     SimulationConfig,
     ControllerConfig,
     IKConfig,
@@ -54,7 +52,6 @@ from teleop_core.controller import ContinuumController  # noqa: E402
 from teleop_core.ik import DampedLeastSquaresIK  # noqa: E402
 from teleop_core.kinematics import ContinuumKinematics  # noqa: E402
 from teleop_core.runtime import MujocoStepper  # noqa: E402
-
 
 DEFAULT_MODEL = "scene_single_arm.xml"
 DEFAULT_LEFT_CAM = "up_cam1"
@@ -98,8 +95,6 @@ class SurgicalStereoRenderer:
             raise RuntimeError(f"Camera not found: {left_camera}")
         if right_id < 0:
             raise RuntimeError(f"Camera not found: {right_camera}")
-
-        option = mj.MjvOption()
 
         _drain_gl_errors("before MjrContext (surgical)")
         mjr_context = mj.MjrContext(model, mj.mjtFontScale.mjFONTSCALE_150)
@@ -224,12 +219,168 @@ class SurgicalSimLoop:
             stop_event.wait(self.config.control_period)
 
 
+def render_loop(
+    model: mj.MjModel,
+    data: mj.MjData,
+    left_camera: str = DEFAULT_LEFT_CAM,
+    right_camera: str = DEFAULT_RIGHT_CAM,
+    comfort_state: RuntimeComfortState | None = None,
+    stop_event: threading.Event | None = None,
+    scene_lock: threading.Lock | None = None,
+    calibr_left_x: int = 0,
+    calibr_left_y: int = 0,
+    calibr_right_x: int = 0,
+    calibr_right_y: int = 0,
+    clear_rgb: tuple[float, float, float] = (0.02, 0.02, 0.02),
+    print_every: float = 2.0,
+    print_diagnostics: bool = True,
+    clutch_callback=None,
+) -> None:
+    """Run OpenXR stereo rendering loop on a shared MuJoCo model+data.
+
+    This function blocks until the user quits (q/Esc) or *stop_event* is set.
+    It only reads *model* / *data* and never writes to them, so an external
+    simulation thread can drive physics concurrently through *scene_lock*.
+
+    Parameters
+    ----------
+    model, data:
+        The MuJoCo model and data owned by the caller.  These are read by
+        ``mjv_updateScene`` / ``mjr_render`` but never mutated.
+    left_camera, right_camera:
+        Names of the fixed cameras to use for the left / right eye.
+    comfort_state:
+        Existing ``RuntimeComfortState`` instance; one is created from the
+        config file if ``None``.
+    stop_event:
+        When set the render loop will exit cleanly at the next frame boundary.
+    scene_lock:
+        Shared lock used by the caller's simulation thread.  The render loop
+        acquires it briefly during every ``render_eye`` call.
+    calibr_*:
+        Per-eye calibration offsets in pixels (overrides config file).
+    clear_rgb:
+        Background clear colour.
+    print_every:
+        Seconds between FPS / state diagnostic prints.
+    print_diagnostics:
+        Print camera diagnostic info at startup.
+    """
+    if comfort_state is None:
+        comfort = load_comfort() or ComfortConfig()
+        comfort_state = RuntimeComfortState(
+            mono_to_both_eyes=comfort.mono_to_both_eyes,
+            swap_eyes=comfort.swap_eyes,
+            scene_farther_px=comfort.scene_farther_px,
+            scene_shift_step_px=comfort.scene_shift_step_px,
+            max_abs_scene_shift_px=comfort.max_abs_scene_shift_px,
+            invert_scene_shift=comfort.invert_scene_shift,
+            zoom=comfort.zoom,
+            zoom_step=comfort.zoom_step,
+        )
+        comfort_state.clamp()
+
+    if stop_event is None:
+        stop_event = threading.Event()
+
+    if scene_lock is None:
+        scene_lock = threading.Lock()
+
+    print("[INFO] VR render loop starting.")
+    print(HINT)
+    _print_comfort_state("[COMFORT]", comfort_state)
+
+    provider = _NvidiaEGLContextProvider()
+    check_openxr()
+
+    from xr.utils.gl import ContextObject
+
+    renderer = None
+    stdin_reader = _StdinReader()
+    start = time.perf_counter()
+    last = start
+    frames = 0
+    running = True
+
+    try:
+        with ContextObject(
+            context_provider=provider,
+            instance_create_info=xr.InstanceCreateInfo(
+                enabled_extension_names=list(_REQUIRED_EXTENSIONS),
+            ),
+        ) as xr_context:
+            provider.make_current()
+            _drain_gl_errors("before SurgicalStereoRenderer.create")
+
+            renderer = SurgicalStereoRenderer.create(
+                model,
+                data,
+                left_camera,
+                right_camera,
+                calib_left_x=calibr_left_x,
+                calib_left_y=calibr_left_y,
+                calib_right_x=calibr_right_x,
+                calib_right_y=calibr_right_y,
+                clear_rgb=clear_rgb,
+            )
+            _drain_gl_errors("after SurgicalStereoRenderer.create")
+
+            if print_diagnostics and scene_lock is not None:
+                mj.mj_forward(model, data)
+                for cam_name in (left_camera, right_camera):
+                    cam_id = mj.mj_name2id(model, mj.mjtObj.mjOBJ_CAMERA, cam_name)
+                    cam_pos = data.cam_xpos[cam_id]
+                    cam_mat = data.cam_xmat[cam_id].reshape(3, 3)
+                    cam_z = cam_mat[:, 2]
+                    print(f"[INFO] {cam_name}: pos={cam_pos} zaxis={cam_z}")
+                print(f"[INFO] Scene geoms: {renderer.scene.ngeom}")
+
+            for _frame_index, frame_state in enumerate(xr_context.frame_loop()):
+                if not running or stop_event.is_set():
+                    break
+
+                for view_index, _view in enumerate(xr_context.view_loop(frame_state)):
+                    with scene_lock:
+                        renderer.render_eye(view_index, comfort_state)
+
+                frames += 1
+                now = time.perf_counter()
+                if now - last >= print_every:
+                    dt = now - last
+                    print(
+                        f"[INFO] FPS: {frames / dt:.1f}  "
+                        f"ZOOM={comfort_state.zoom:.2f}  "
+                        f"SCENE_FARTHER={comfort_state.scene_farther_px:+.1f}px  "
+                        f"MONO={'on' if comfort_state.mono_to_both_eyes else 'off'}  "
+                        f"SWAP={'on' if comfort_state.swap_eyes else 'off'}"
+                    )
+                    frames = 0
+                    last = now
+
+                def _unhandled_cb(ch: str) -> bool:
+                    if ch == " " and clutch_callback is not None:
+                        clutch_callback()
+                        return True
+                    return True
+
+                running = _handle_input(stdin_reader, comfort_state, _unhandled_cb)
+
+    finally:
+        stop_event.set()
+        stdin_reader.restore()
+        if renderer is not None:
+            renderer.close()
+        provider.destroy()
+        print("\n[RESULT] Final state:")
+        _print_comfort_state(" ", comfort_state)
+
+
 def parse_args():
     calib = load_calibration()
     comfort = load_comfort()
 
     parser = argparse.ArgumentParser(
-        description="Surgical continuum robot stereo rendering to OpenXR (VIVE)."
+        description="Surgical continuum robot stereo preview (standalone, with built-in sim)."
     )
     parser.add_argument(
         "--model",
@@ -268,12 +419,10 @@ def parse_args():
     parser.add_argument(
         "--zoom", type=float,
         default=comfort.zoom if comfort else 1.0,
-        help="FOV zoom factor. >1 = wider FOV (see more).",
     )
     parser.add_argument(
         "--zoom-step", type=float,
         default=comfort.zoom_step if comfort else 0.1,
-        help="Keyboard zoom adjustment step.",
     )
     parser.add_argument("--clear-rgb", type=float, nargs=3, metavar=("R", "G", "B"),
                         default=comfort.to_rgb_tuple() if comfort else (0.02, 0.02, 0.02))
@@ -285,8 +434,7 @@ def parse_args():
                         default=calib.right_x if calib else 0)
     parser.add_argument("--calib-right-y", type=int,
                         default=calib.right_y if calib else 0)
-    parser.add_argument("--save", action="store_true",
-                        help="Save calibration and comfort to config on exit.")
+    parser.add_argument("--save", action="store_true")
 
     return parser.parse_args()
 
@@ -294,15 +442,14 @@ def parse_args():
 def main() -> int:
     args = parse_args()
 
-    print("[INFO] Surgical Robot — OpenXR Stereo (VIVE)")
+    print("[INFO] Surgical Robot — OpenXR Stereo preview (standalone)")
     print("[INFO] Model:", args.model)
     print("[INFO] Cameras:", args.left_camera, "/", args.right_camera)
-    print(HINT)
 
     cfg_path = _default_config_path()
-    src = f"from {cfg_path}" if cfg_path.exists() else "defaults"
     has_calib = any((args.calib_left_x, args.calib_left_y, args.calib_right_x, args.calib_right_y))
     if has_calib:
+        src = f"from {cfg_path}" if cfg_path.exists() else "CLI"
         print(f"[INFO] Calibration ({src}): "
               f"L=({args.calib_left_x:+d}, {args.calib_left_y:+d})  "
               f"R=({args.calib_right_x:+d}, {args.calib_right_y:+d})")
@@ -318,7 +465,6 @@ def main() -> int:
         zoom_step=args.zoom_step,
     )
     comfort_state.clamp()
-    _print_comfort_state("[COMFORT]", comfort_state)
 
     mjcf_dir = ROBOT_PROJECT_ROOT / "model" / "continuum_robot" / "mjcf"
     xml_path = mjcf_dir / args.model
@@ -334,16 +480,8 @@ def main() -> int:
     controller = ContinuumController(scene, ik, ControllerConfig())
 
     scene.initialize_mocap_to_tip()
-    print("[INFO] Robot controller initialized. Target stays at initial tip pose.")
-    print("[INFO] Drag target_body in mujoco viewer for interaction, or connect Omega.7.")
+    print("[INFO] Standalone controller initialized (target at initial tip pose).")
 
-    provider = _NvidiaEGLContextProvider()
-    check_openxr()
-
-    from xr.utils.gl import ContextObject
-
-    renderer = None
-    stdin_reader = _StdinReader()
     scene_lock = threading.Lock()
     stop_event = threading.Event()
 
@@ -354,109 +492,47 @@ def main() -> int:
         daemon=True,
         name="surgical-sim",
     )
+    sim_thread.start()
+    print("[INFO] Built-in simulation thread started.")
 
-    start = time.perf_counter()
-    last = start
-    frames = 0
-    running = True
+    render_loop(
+        model=scene.model,
+        data=scene.data,
+        left_camera=args.left_camera,
+        right_camera=args.right_camera,
+        comfort_state=comfort_state,
+        stop_event=stop_event,
+        scene_lock=scene_lock,
+        calibr_left_x=args.calib_left_x,
+        calibr_left_y=args.calib_left_y,
+        calibr_right_x=args.calib_right_x,
+        calibr_right_y=args.calib_right_y,
+        clear_rgb=tuple(args.clear_rgb),
+        print_every=args.print_every,
+    )
 
-    try:
-        with ContextObject(
-            context_provider=provider,
-            instance_create_info=xr.InstanceCreateInfo(
-                enabled_extension_names=list(_REQUIRED_EXTENSIONS),
-            ),
-        ) as xr_context:
-            provider.make_current()
-            _drain_gl_errors("before SurgicalStereoRenderer.create")
-
-            renderer = SurgicalStereoRenderer.create(
-                scene.model,
-                scene.data,
-                args.left_camera,
-                args.right_camera,
-                calib_left_x=args.calib_left_x,
-                calib_left_y=args.calib_left_y,
-                calib_right_x=args.calib_right_x,
-                calib_right_y=args.calib_right_y,
-                clear_rgb=tuple(args.clear_rgb),
-            )
-            _drain_gl_errors("after SurgicalStereoRenderer.create")
-
-            sim_thread.start()
-            print("[INFO] Simulation thread started.")
-
-            # Print camera diagnostic
-            mj.mj_forward(scene.model, scene.data)
-            for cam_name in (args.left_camera, args.right_camera):
-                cam_id = mj.mj_name2id(scene.model, mj.mjtObj.mjOBJ_CAMERA, cam_name)
-                cam_pos = scene.data.cam_xpos[cam_id]
-                cam_mat = scene.data.cam_xmat[cam_id].reshape(3, 3)
-                cam_z = cam_mat[:, 2]
-                tip_pos = scene.data.site_xpos[scene.ids.tip_site]
-                print(f"[INFO] {cam_name}: pos={cam_pos} zaxis={cam_z} tip_dist={np.linalg.norm(tip_pos - cam_pos):.3f}m")
-            print(f"[INFO] Tip site: {tip_pos}")
-            print(f"[INFO] Scene geoms rendered: {renderer.scene.ngeom}")
-            print("[INFO] If screen is black, try: --clear-rgb 0.3 0.3 0.4 to brighten background")
-
-            for frame_index, frame_state in enumerate(xr_context.frame_loop()):
-                if not running:
-                    break
-
-                for view_index, _view in enumerate(xr_context.view_loop(frame_state)):
-                    with scene_lock:
-                        renderer.render_eye(view_index, comfort_state)
-
-                frames += 1
-                now = time.perf_counter()
-                if now - last >= args.print_every:
-                    dt = now - last
-                    print(
-                        f"[INFO] FPS: {frames / dt:.1f}  "
-                        f"ZOOM={comfort_state.zoom:.2f}  "
-                        f"SCENE_FARTHER={comfort_state.scene_farther_px:+.1f}px  "
-                        f"MONO={'on' if comfort_state.mono_to_both_eyes else 'off'}  "
-                        f"SWAP={'on' if comfort_state.swap_eyes else 'off'}"
-                    )
-                    frames = 0
-                    last = now
-
-                running = _handle_input(stdin_reader, comfort_state)
-
-                if args.max_frames > 0 and frame_index + 1 >= args.max_frames:
-                    break
-
-    finally:
-        stop_event.set()
-        stdin_reader.restore()
-        if renderer is not None:
-            renderer.close()
-        provider.destroy()
-        print("\n[RESULT] Final state:")
-        _print_comfort_state(" ", comfort_state)
-
-        if args.save:
-            cal = Calibration(
-                left_x=args.calib_left_x,
-                left_y=args.calib_left_y,
-                right_x=args.calib_right_x,
-                right_y=args.calib_right_y,
-            )
-            comf = ComfortConfig(
-                mono_to_both_eyes=comfort_state.mono_to_both_eyes,
-                swap_eyes=comfort_state.swap_eyes,
-                scene_farther_px=comfort_state.scene_farther_px,
-                scene_shift_step_px=comfort_state.scene_shift_step_px,
-                max_abs_scene_shift_px=comfort_state.max_abs_scene_shift_px,
-                invert_scene_shift=comfort_state.invert_scene_shift,
-                zoom=comfort_state.zoom,
-                zoom_step=comfort_state.zoom_step,
-                clear_r=renderer.clear_r if renderer else 0.02,
-                clear_g=renderer.clear_g if renderer else 0.02,
-                clear_b=renderer.clear_b if renderer else 0.02,
-            )
-            save_full_config(cal, comf)
-            print(f"[INFO] Saved to {_default_config_path()}")
+    if args.save:
+        cal = Calibration(
+            left_x=args.calib_left_x,
+            left_y=args.calib_left_y,
+            right_x=args.calib_right_x,
+            right_y=args.calib_right_y,
+        )
+        comf = ComfortConfig(
+            mono_to_both_eyes=comfort_state.mono_to_both_eyes,
+            swap_eyes=comfort_state.swap_eyes,
+            scene_farther_px=comfort_state.scene_farther_px,
+            scene_shift_step_px=comfort_state.scene_shift_step_px,
+            max_abs_scene_shift_px=comfort_state.max_abs_scene_shift_px,
+            invert_scene_shift=comfort_state.invert_scene_shift,
+            zoom=comfort_state.zoom,
+            zoom_step=comfort_state.zoom_step,
+            clear_r=0.02,
+            clear_g=0.02,
+            clear_b=0.02,
+        )
+        save_full_config(cal, comf)
+        print(f"[INFO] Saved to {_default_config_path()}")
 
     return 0
 

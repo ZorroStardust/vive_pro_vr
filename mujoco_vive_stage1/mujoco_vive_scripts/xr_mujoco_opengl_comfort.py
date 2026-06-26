@@ -706,7 +706,8 @@ def _print_comfort_state(prefix: str, state: RuntimeComfortState, end: str = "\n
     )
 
 
-def _handle_input(reader: _StdinReader, state: RuntimeComfortState) -> bool:
+def _handle_input(reader: _StdinReader, state: RuntimeComfortState,
+                  unhandled_cb=None) -> bool:
     key = reader.read_key()
     if key is None:
         return True
@@ -756,6 +757,9 @@ def _handle_input(reader: _StdinReader, state: RuntimeComfortState) -> bool:
         )
         save_full_config(cal, comfort, cfg_path)
         print(f"\r[SAVED] {cfg_path}", flush=True)
+    elif unhandled_cb is not None and not changed:
+        if not unhandled_cb(ch):
+            return False
 
     if changed:
         _print_comfort_state("\r[COMFORT]", state, end="")
