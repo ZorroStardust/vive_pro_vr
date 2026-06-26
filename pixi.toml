@@ -1,0 +1,29 @@
+[workspace]
+name = "vive_pro_vr"
+version = "0.1.0"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = ">=3.13.3,<3.14"
+mujoco = ">=3.9.0"
+numpy = ">=1.24"
+pillow = ">=10.0"
+pyopengl = ">=3.1.7"
+
+[pypi-dependencies]
+pyopenxr = ">=1.0.0"
+glfw = ">=2.7.0"
+mujoco-vive-scripts = { path = "mujoco_vive_scripts", editable = true }
+
+[tasks]
+list-monitors = { cmd = "python -m mujoco_vive_scripts.list_monitors", cwd = "mujoco_vive_scripts" }
+openxr-check = { cmd = "python -m mujoco_vive_scripts.openxr_env_check", cwd = "mujoco_vive_scripts" }
+save-frames = { cmd = "bash scripts/run_save_frames.sh", cwd = "mujoco_vive_scripts" }
+sbs-windowed = { cmd = "bash scripts/run_sbs_windowed.sh", cwd = "mujoco_vive_scripts" }
+sbs-fullscreen = { cmd = "bash scripts/run_sbs_fullscreen_monitor.sh $MONITOR", cwd = "mujoco_vive_scripts" }
+start-monado = { cmd = "bash scripts/start_monado_hmd_only.sh", cwd = "mujoco_vive_scripts" }
+test-openxr = { cmd = "bash scripts/test_openxr.sh", cwd = "mujoco_vive_scripts" }
+install-system-deps = { cmd = "bash scripts/install_ubuntu2404.sh", cwd = "mujoco_vive_scripts" }
+xr-pink-world = { cmd = "bash scripts/run_xr_pink_world.sh", cwd = "mujoco_vive_scripts" }
+xr-mujoco-opengl = { cmd = "bash scripts/run_xr_mujoco_opengl.sh", cwd = "mujoco_vive_scripts" }

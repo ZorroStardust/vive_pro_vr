@@ -1,0 +1,8 @@
+[console_scripts]
+mvs-list-monitors = mujoco_vive_scripts.list_monitors:main
+mvs-mujoco-sbs = mujoco_vive_scripts.mujoco_sbs_glfw:main
+mvs-openxr-check = mujoco_vive_scripts.openxr_env_check:main
+mvs-save-stereo-frames = mujoco_vive_scripts.save_stereo_frames:main
+mvs-xr-crosshair = mujoco_vive_scripts.xr_crosshair_calibration:main
+mvs-xr-mujoco-opengl = mujoco_vive_scripts.xr_mujoco_opengl:main
+mvs-xr-pink = mujoco_vive_scripts.xr_pink_world_check:main

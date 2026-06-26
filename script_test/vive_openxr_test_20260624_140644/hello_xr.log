@@ -1,0 +1,112 @@
+[hello] starting at 2026年 06月 24日 星期三 14:06:47 CST
+[hello] XR_RUNTIME_JSON=/usr/share/openxr/1/openxr_monado.json
+[hello] XDG_RUNTIME_DIR=/run/user/1000
+[hello] socket:
+srwxrwxr-x 1 zorro zorro 0  6月 24 14:06 /run/user/1000/monado_comp_ipc
+
+[hello] help:
+[14:06:47.481][Info   ] HelloXr --graphics|-g <Graphics API> [--formfactor|-ff <Form factor>] [--viewconfig|-vc <View config>] [--blendmode|-bm <Blend mode>] [--space|-s <Space>] [--verbose|-v]
+[14:06:47.481][Info   ] Graphics APIs:            D3D11, D3D12, OpenGLES, OpenGL, Vulkan2, Vulkan
+[14:06:47.481][Info   ] Form factors:             Hmd, Handheld
+[14:06:47.481][Info   ] View configurations:      Mono, Stereo
+[14:06:47.481][Info   ] Environment blend modes:  Opaque, Additive, AlphaBlend
+[14:06:47.481][Info   ] Spaces:                   View, Local, Stage
+
+[hello] running:
+hello_xr -g Vulkan -ff Hmd -vc Stereo -s Local -v
+Verbose [GENERAL | xrEnumerateInstanceExtensionProperties | OpenXR-Loader] : Entering loader trampoline
+Info [GENERAL |  | OpenXR-Loader] : RuntimeManifestFile::FindManifestFiles - using environment variable override runtime file /usr/share/openxr/1/openxr_monado.json
+Info [GENERAL |  | OpenXR-Loader] : RuntimeManifestFile::CreateIfValid - attempting to load /usr/share/openxr/1/openxr_monado.json
+[14:06:47.484][Info   ] Press any key to shutdown...
+Info [GENERAL | xrEnumerateInstanceExtensionProperties | OpenXR-Loader] : RuntimeInterface::LoadRuntime succeeded loading runtime defined in manifest file /usr/share/openxr/1/openxr_monado.json using interface version 1 and OpenXR API version 1.0
+Verbose [GENERAL | xrEnumerateInstanceExtensionProperties | OpenXR-Loader] : Completed loader trampoline
+Verbose [GENERAL | xrEnumerateInstanceExtensionProperties | OpenXR-Loader] : Entering loader trampoline
+Verbose [GENERAL | xrEnumerateInstanceExtensionProperties | OpenXR-Loader] : Completed loader trampoline
+[14:06:47.485][Verbose] Available Extensions: (24)
+[14:06:47.485][Verbose]   Name=XR_KHR_binding_modification SpecVersion=1
+[14:06:47.485][Verbose]   Name=XR_KHR_composition_layer_cube SpecVersion=8
+[14:06:47.485][Verbose]   Name=XR_KHR_composition_layer_cylinder SpecVersion=4
+[14:06:47.485][Verbose]   Name=XR_KHR_composition_layer_depth SpecVersion=6
+[14:06:47.485][Verbose]   Name=XR_KHR_composition_layer_equirect SpecVersion=3
+[14:06:47.485][Verbose]   Name=XR_KHR_composition_layer_equirect2 SpecVersion=1
+[14:06:47.485][Verbose]   Name=XR_KHR_convert_timespec_time SpecVersion=1
+[14:06:47.485][Verbose]   Name=XR_KHR_opengl_enable SpecVersion=10
+[14:06:47.485][Verbose]   Name=XR_KHR_opengl_es_enable SpecVersion=8
+[14:06:47.485][Verbose]   Name=XR_KHR_swapchain_usage_input_attachment_bit SpecVersion=3
+[14:06:47.485][Verbose]   Name=XR_KHR_vulkan_enable SpecVersion=8
+[14:06:47.485][Verbose]   Name=XR_KHR_vulkan_enable2 SpecVersion=2
+[14:06:47.485][Verbose]   Name=XR_EXT_dpad_binding SpecVersion=1
+[14:06:47.485][Verbose]   Name=XR_EXT_hand_tracking SpecVersion=4
+[14:06:47.485][Verbose]   Name=XR_EXT_hp_mixed_reality_controller SpecVersion=1
+[14:06:47.485][Verbose]   Name=XR_EXT_samsung_odyssey_controller SpecVersion=1
+[14:06:47.485][Verbose]   Name=XR_FB_display_refresh_rate SpecVersion=1
+[14:06:47.485][Verbose]   Name=XR_ML_ml2_controller_interaction SpecVersion=1
+[14:06:47.485][Verbose]   Name=XR_MND_headless SpecVersion=2
+[14:06:47.485][Verbose]   Name=XR_MND_swapchain_usage_input_attachment_bit SpecVersion=2
+[14:06:47.485][Verbose]   Name=XR_EXTX_overlay SpecVersion=5
+[14:06:47.485][Verbose]   Name=XR_MNDX_egl_enable SpecVersion=1
+[14:06:47.485][Verbose]   Name=XR_MNDX_force_feedback_curl SpecVersion=1
+[14:06:47.485][Verbose]   Name=XR_EXT_debug_utils SpecVersion=4
+Verbose [GENERAL | xrEnumerateApiLayerProperties | OpenXR-Loader] : Entering loader trampoline
+Verbose [GENERAL | xrEnumerateApiLayerProperties | OpenXR-Loader] : Entering loader trampoline
+[14:06:47.485][Info   ] Available Layers: (0)
+Verbose [GENERAL | xrCreateInstance | OpenXR-Loader] : Entering loader trampoline
+Verbose [GENERAL | xrCreateInstance | OpenXR-Loader] : Entering LoaderInstance::CreateInstance
+Verbose [GENERAL | xrCreateInstance | OpenXR-Loader] : Entering loader terminator
+LOG in xrCreateInstance: Instance created
+	createInfo->applicationInfo.applicationName: HelloXR
+	createInfo->applicationInfo.applicationVersion: 0
+	createInfo->applicationInfo.engineName: 
+	createInfo->applicationInfo.engineVersion: 0
+	appinfo.detected.engine.name: (null)
+	appinfo.detected.engine.version: 0.0.0
+	quirks.disable_vulkan_format_depth_stencil: false
+LOG in xrCreateInstance: Selected devices
+	Head: 'HTC Vive Pro (vive)'
+	Left: '<none>'
+	Right: '<none>'
+	Hand-Tracking Left: '<none>'
+	Hand-Tracking Right: '<none>'
+Verbose [GENERAL | xrCreateInstance | OpenXR-Loader] : Completed loader terminator
+Info [GENERAL | xrCreateInstance | OpenXR-Loader] : LoaderInstance::CreateInstance succeeded with 0 layers enabled and runtime interface - created instance = 0x00005ea09a4e3df0
+Verbose [GENERAL | xrCreateInstance | OpenXR-Loader] : Completed loader trampoline
+[14:06:47.492][Info   ] Instance RuntimeName=Monado(XRT) by Collabora et al 'GIT-NOTFOUND' RuntimeVersion=21.0.0
+[14:06:47.492][Verbose] Using system 1 for form factor XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY
+[14:06:47.492][Info   ] Available View Configuration Types: (1)
+[14:06:47.492][Verbose]   View Configuration Type: XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO (Selected)
+[14:06:47.492][Verbose]   View configuration FovMutable=False
+[14:06:47.492][Verbose]     View [0]: Recommended Width=2015 Height=2240 SampleCount=1
+[14:06:47.492][Verbose]     View [0]:     Maximum Width=2880 Height=3200 SampleCount=1
+[14:06:47.492][Verbose]     View [1]: Recommended Width=2015 Height=2240 SampleCount=1
+[14:06:47.492][Verbose]     View [1]:     Maximum Width=2880 Height=3200 SampleCount=1
+[14:06:47.492][Info   ] Available Environment Blend Mode count : (1)
+[14:06:47.492][Info   ] Environment Blend Mode (XR_ENVIRONMENT_BLEND_MODE_OPAQUE) : (Selected)
+[14:06:47.492][Warning] No validation layers found in the system, skipping
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message] linux_read_sorted_physical_devices:
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]      Original order:
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [0] llvmpipe (LLVM 20.1.2, 256 bits)
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [1] NVIDIA GeForce RTX 5060 Ti
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]      Sorted order:
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [0] NVIDIA GeForce RTX 5060 Ti  
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [1] llvmpipe (LLVM 20.1.2, 256 bits)  
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message] linux_read_sorted_physical_devices:
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]      Original order:
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [0] llvmpipe (LLVM 20.1.2, 256 bits)
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [1] NVIDIA GeForce RTX 5060 Ti
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]      Sorted order:
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [0] NVIDIA GeForce RTX 5060 Ti  
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [1] llvmpipe (LLVM 20.1.2, 256 bits)  
+[14:06:47.560][Verbose] DEBUG: (INSTANCE 0x5ea09a4f0740) [Loader Message] Copying old device 0 into new device 0
+[14:06:47.560][Verbose] DEBUG: (INSTANCE 0x5ea09a4f0740) [Loader Message] Copying old device 1 into new device 1
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message] linux_read_sorted_physical_devices:
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]      Original order:
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [0] llvmpipe (LLVM 20.1.2, 256 bits)
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [1] NVIDIA GeForce RTX 5060 Ti
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]      Sorted order:
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [0] NVIDIA GeForce RTX 5060 Ti  
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [1] llvmpipe (LLVM 20.1.2, 256 bits)  
+[14:06:47.560][Verbose] DEBUG: (INSTANCE 0x5ea09a4f0740) [Loader Message] Copying old device 0 into new device 0
+[14:06:47.560][Verbose] DEBUG: (INSTANCE 0x5ea09a4f0740) [Loader Message] Copying old device 1 into new device 1
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message] linux_read_sorted_physical_devices:
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]      Original order:
+[14:06:47.560][Info   ] INFO: (INSTANCE 0x5ea09a4f0740) [Loader Message]            [0] llvmpipe (LLVM 20.1

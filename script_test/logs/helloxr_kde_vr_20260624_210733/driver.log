@@ -1,0 +1,43 @@
+started at 2026年 06月 24日 星期三 21:07:33 CST
+LOGDIR=/home/zorro/projects/vive_pro_vr/script_test/logs/helloxr_kde_vr_20260624_210733
+RUN_SECONDS=60
+HMD_CONNECTOR=DP-3
+XR_RUNTIME_JSON=/usr/share/openxr/1/openxr_monado.json
+XDG_RUNTIME_DIR=/run/user/1000
+
+== Pre-check ==
+== Session ==
+XDG_SESSION_TYPE=wayland
+XDG_CURRENT_DESKTOP=KDE
+WAYLAND_DISPLAY=wayland-0
+DISPLAY=:1
+XDG_RUNTIME_DIR=/run/user/1000
+
+== Commands ==
+[OK] tmux -> /usr/bin/tmux
+[OK] monado-service -> /usr/bin/monado-service
+[OK] hello_xr -> /usr/bin/hello_xr
+[OK] wayland-info -> /usr/bin/wayland-info
+
+== Runtime ==
+[OK] XR_RUNTIME_JSON=/usr/share/openxr/1/openxr_monado.json
+
+== Wayland DRM lease ==
+[OK] Wayland compositor exposes DRM lease protocol
+interface: 'wp_drm_lease_device_v1',                     version:  1, name: 51
+
+== DRM connector guess ==
+connector=/sys/class/drm/card1-DP-3
+status=connected
+modes:
+2880x1600
+
+
+== Cleanup before run ==
+
+== Start Monado in tmux ==
+
+== Wait for Monado IPC socket ==
+FAILED: tmux/monado session exited before socket was created
+FAILED: no Monado IPC socket
+See logs: /home/zorro/projects/vive_pro_vr/script_test/logs/helloxr_kde_vr_20260624_210733

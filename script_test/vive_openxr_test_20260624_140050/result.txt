@@ -1,0 +1,43 @@
+Monado IPC socket ready after 3s
+
+=== summary ===
+[31mERROR [0m[init_valve_index] Valve Index manufacturer string did not match.
+[31mERROR [0m[vive_found] Failed after opening Vive device?
+[31mERROR [0m[vive_controller_create] Could not get Vive controller config
+[31mERROR [0m[vive_controller_create] Could not get Vive controller config
+[36mDEBUG [0m[fill_in_results] Suggest 0 with uuid: 5c c0 ed 67 67 36 43 69 df 65 d9 df 80 22 de dd to clients
+[36mDEBUG [0m[comp_window_vk_display_init_swapchain] Will use display: HTC Corporation VIVE Pro (DP-4)
+[32m INFO [0m[print_modes] |  0 | 2880x1600@90.04
+[32m INFO [0m[print_modes] |  1 | 2880x1600@90.04
+[36mDEBUG [0m[comp_window_direct_get_primary_display_mode] found display mode 2880x1600@90.04
+[36mDEBUG [0m[comp_window_direct_get_primary_display_mode] Updating compositor settings nominal frame interval from 11111111 (90.000001 Hz) to 11106051 (90.041000 Hz)
+[36mDEBUG [0m[create_listen_socket] Created listening socket /run/user/1000/monado_comp_ipc.
+[36mDEBUG [0m[compositor_begin_session] BEGIN_SESSION
+[32m INFO [0m[update_session_state_locked] Doing warm start, 0 active app session(s).
+[36mDEBUG [0m[compositor_end_session] END_SESSION
+[32m INFO [0m[update_session_state_locked] Stopped native session, 0 active app session(s).
+ERROR [init_valve_index] Valve Index man
+ERROR [vive_found] Failed after opening
+ERROR [vive_controller_create] Could not
+ERROR [vive_controller_create] Could not
+ 80 22 de dd to clients
+hain] Will use display: HTC Corporation
+ INFO [print_modes] |  0 | 2880x1600@90.
+ INFO [print_modes] |  1 | 2880x1600@90.
+splay_mode] found display mode 2880x1600
+ nominal frame interval from 11111111 (9
+DEBUG [compositor_begin_session] BEGIN_S
+ INFO [update_session_state_locked] Doin
+g warm start, 0 active app session(s).
+DEBUG [compositor_end_session] END_SESSI
+ INFO [update_session_state_locked] Stop
+ped native session, 0 active app session
+echo '[hello] exit status:' $?
+[0m[27m[24m[Jdquote> [K[?1h=[?2004heecho '[hello] exit status:' $?[?1l>[?2004l
+[14:00:54.005][Error  ] GraphicsPlugin parameter is required
+[hello] exit status: 0
+echo '[hello] exit status:' $?
+dquote> echo '[hello] exit status:' $?
+[14:00:54.005][Error  ] GraphicsPlugin
+[hello] exit status: 0
+finished at 2026年 06月 24日 星期三 14:02:28 CST

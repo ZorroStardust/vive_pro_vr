@@ -1,0 +1,106 @@
+LOG in xrCreateInstance: Instance created
+	createInfo->applicationInfo.applicationName: HelloXR
+	createInfo->applicationInfo.applicationVersion: 0
+	createInfo->applicationInfo.engineName: 
+	createInfo->applicationInfo.engineVersion: 0
+	appinfo.detected.engine.name: (null)
+	appinfo.detected.engine.version: 0.0.0
+	quirks.disable_vulkan_format_depth_stencil: false
+LOG in xrCreateInstance: Selected devices
+	Head: 'HTC Vive Pro (vive)'
+	Left: '<none>'
+	Right: '<none>'
+	Hand-Tracking Left: '<none>'
+	Hand-Tracking Right: '<none>'
+[14:48:28.973][Info   ] Press any key to shutdown...
+[14:48:28.974][Verbose] Available Extensions: (24)
+[14:48:28.974][Verbose]   Name=XR_KHR_binding_modification SpecVersion=1
+[14:48:28.974][Verbose]   Name=XR_KHR_composition_layer_cube SpecVersion=8
+[14:48:28.974][Verbose]   Name=XR_KHR_composition_layer_cylinder SpecVersion=4
+[14:48:28.974][Verbose]   Name=XR_KHR_composition_layer_depth SpecVersion=6
+[14:48:28.974][Verbose]   Name=XR_KHR_composition_layer_equirect SpecVersion=3
+[14:48:28.974][Verbose]   Name=XR_KHR_composition_layer_equirect2 SpecVersion=1
+[14:48:28.974][Verbose]   Name=XR_KHR_convert_timespec_time SpecVersion=1
+[14:48:28.974][Verbose]   Name=XR_KHR_opengl_enable SpecVersion=10
+[14:48:28.974][Verbose]   Name=XR_KHR_opengl_es_enable SpecVersion=8
+[14:48:28.974][Verbose]   Name=XR_KHR_swapchain_usage_input_attachment_bit SpecVersion=3
+[14:48:28.974][Verbose]   Name=XR_KHR_vulkan_enable SpecVersion=8
+[14:48:28.974][Verbose]   Name=XR_KHR_vulkan_enable2 SpecVersion=2
+[14:48:28.974][Verbose]   Name=XR_EXT_dpad_binding SpecVersion=1
+[14:48:28.974][Verbose]   Name=XR_EXT_hand_tracking SpecVersion=4
+[14:48:28.974][Verbose]   Name=XR_EXT_hp_mixed_reality_controller SpecVersion=1
+[14:48:28.974][Verbose]   Name=XR_EXT_samsung_odyssey_controller SpecVersion=1
+[14:48:28.974][Verbose]   Name=XR_FB_display_refresh_rate SpecVersion=1
+[14:48:28.974][Verbose]   Name=XR_ML_ml2_controller_interaction SpecVersion=1
+[14:48:28.974][Verbose]   Name=XR_MND_headless SpecVersion=2
+[14:48:28.974][Verbose]   Name=XR_MND_swapchain_usage_input_attachment_bit SpecVersion=2
+[14:48:28.974][Verbose]   Name=XR_EXTX_overlay SpecVersion=5
+[14:48:28.974][Verbose]   Name=XR_MNDX_egl_enable SpecVersion=1
+[14:48:28.974][Verbose]   Name=XR_MNDX_force_feedback_curl SpecVersion=1
+[14:48:28.974][Verbose]   Name=XR_EXT_debug_utils SpecVersion=4
+[14:48:28.974][Info   ] Available Layers: (0)
+[14:48:28.984][Info   ] Instance RuntimeName=Monado(XRT) by Collabora et al 'GIT-NOTFOUND' RuntimeVersion=21.0.0
+[14:48:28.984][Verbose] Using system 1 for form factor XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY
+[14:48:28.984][Info   ] Available View Configuration Types: (1)
+[14:48:28.984][Verbose]   View Configuration Type: XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO (Selected)
+[14:48:28.984][Verbose]   View configuration FovMutable=False
+[14:48:28.984][Verbose]     View [0]: Recommended Width=2015 Height=2240 SampleCount=1
+[14:48:28.984][Verbose]     View [0]:     Maximum Width=2880 Height=3200 SampleCount=1
+[14:48:28.984][Verbose]     View [1]: Recommended Width=2015 Height=2240 SampleCount=1
+[14:48:28.984][Verbose]     View [1]:     Maximum Width=2880 Height=3200 SampleCount=1
+[14:48:28.984][Info   ] Available Environment Blend Mode count : (1)
+[14:48:28.984][Info   ] Environment Blend Mode (XR_ENVIRONMENT_BLEND_MODE_OPAQUE) : (Selected)
+[14:48:28.985][Warning] No validation layers found in the system, skipping
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message] linux_read_sorted_physical_devices:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]      Original order:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [0] llvmpipe (LLVM 20.1.2, 256 bits)
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [1] NVIDIA GeForce RTX 5060 Ti
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]      Sorted order:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [0] NVIDIA GeForce RTX 5060 Ti  
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [1] llvmpipe (LLVM 20.1.2, 256 bits)  
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message] linux_read_sorted_physical_devices:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]      Original order:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [0] llvmpipe (LLVM 20.1.2, 256 bits)
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [1] NVIDIA GeForce RTX 5060 Ti
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]      Sorted order:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [0] NVIDIA GeForce RTX 5060 Ti  
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [1] llvmpipe (LLVM 20.1.2, 256 bits)  
+[14:48:29.024][Verbose] DEBUG: (INSTANCE 0x5dd48c7047c0) [Loader Message] Copying old device 0 into new device 0
+[14:48:29.024][Verbose] DEBUG: (INSTANCE 0x5dd48c7047c0) [Loader Message] Copying old device 1 into new device 1
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message] linux_read_sorted_physical_devices:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]      Original order:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [0] llvmpipe (LLVM 20.1.2, 256 bits)
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [1] NVIDIA GeForce RTX 5060 Ti
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]      Sorted order:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [0] NVIDIA GeForce RTX 5060 Ti  
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [1] llvmpipe (LLVM 20.1.2, 256 bits)  
+[14:48:29.024][Verbose] DEBUG: (INSTANCE 0x5dd48c7047c0) [Loader Message] Copying old device 0 into new device 0
+[14:48:29.024][Verbose] DEBUG: (INSTANCE 0x5dd48c7047c0) [Loader Message] Copying old device 1 into new device 1
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message] linux_read_sorted_physical_devices:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]      Original order:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [0] llvmpipe (LLVM 20.1.2, 256 bits)
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [1] NVIDIA GeForce RTX 5060 Ti
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]      Sorted order:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [0] NVIDIA GeForce RTX 5060 Ti  
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]            [1] llvmpipe (LLVM 20.1.2, 256 bits)  
+[14:48:29.024][Verbose] DEBUG: (INSTANCE 0x5dd48c7047c0) [Loader Message] Copying old device 0 into new device 0
+[14:48:29.024][Verbose] DEBUG: (INSTANCE 0x5dd48c7047c0) [Loader Message] Copying old device 1 into new device 1
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message] Failed to find vkGetDeviceProcAddr in layer "libVkLayer_MESA_device_select.so"
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message] vkCreateDevice layer callstack setup to:
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]    <Application>
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]      ||
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]    <Loader>
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]      ||
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]    <Device>
+[14:48:29.024][Info   ] INFO: (INSTANCE 0x5dd48c7047c0) [Loader Message]        Using "NVIDIA GeForce RTX 5060 Ti" with driver: "libGLX_nvidia.so.0"
+[14:48:29.092][Info   ] Loaded vertex shader
+[14:48:29.092][Info   ] Loaded fragment shader
+[14:48:29.093][Verbose] Creating session...
+[14:48:29.094][Info   ] Available reference spaces: 3
+[14:48:29.094][Verbose]   Name: XR_REFERENCE_SPACE_TYPE_VIEW
+[14:48:29.094][Verbose]   Name: XR_REFERENCE_SPACE_TYPE_LOCAL
+[14:48:29.094][Verbose]   Name: XR_REFERENCE_SPACE_TYPE_STAGE
+[14:48:29.094][Info   ] System Properties: Name=Monado: HTC Vive Pro (vive) VendorId=42
+[14:48:29.094][Info   ] System Graphics Properties: MaxWidth=16384 MaxHeight=16384 MaxLayers=16
+[14:48:29.094][Info   ] System Tracking Properties: OrientationTracking=True PositionTracking=False
+[14:48:29.094][Ve

@@ -1,0 +1,168 @@
+DEBUG [u_metrics_init] No metrics file!
+ INFO [ipc_server_main] Monado Service GIT-NOTFOUND starting up...
+ INFO [is_json_ok] No config file was loaded!
+ INFO [is_json_ok] No config file was loaded!
+ERROR [init_valve_index] Valve Index manufacturer string did not match.
+ERROR [vive_found] Failed after opening Vive device?
+ WARN [vive_get_imu_range_report] Gyroscope or accelerometer range too large.
+ WARN [vive_get_imu_range_report] Gyroscope: 177
+ WARN [vive_get_imu_range_report] Accelerometer: 112
+ INFO [vive_read_config] Could not get config start report for device, connected device may be powered off (-1).
+ERROR [vive_controller_create] Could not get Vive controller config
+
+ INFO [vive_read_config] Could not get config start report for device, connected device may be powered off (-1).
+ERROR [vive_controller_create] Could not get Vive controller config
+
+ INFO [lighthouse_open_system] HMD didn't have cameras or didn't have a valid camera calibration. Not creating visual trackers.
+ INFO [p_create_system] Creating system:
+        Builders:
+                rift_s: Oculus Rift S
+                rgb_tracking: RGB tracking based devices (PSVR, PSMV, ...)
+                simulated: Simulated devices builder
+                lighthouse: Lighthouse-tracked (Vive, Index, Tundra trackers, etc.) devices builder
+                remote: Remote simulation devices builder
+                north_star: North Star headset
+                legacy: Legacy probing system
+        No builder selected in config (or wasn't compiled in)
+        Selected lighthouse because it was certain it could create a head
+        Using builder lighthouse: Lighthouse-tracked (Vive, Index, Tundra trackers, etc.) devices builder
+        Got devices:
+                0: HTC Vive Pro (vive)
+        In roles:
+                head: HTC Vive Pro (vive)
+                left: <none>
+                right: <none>
+                gamepad: <none>
+                hand_tracking.left: <none>
+                hand_tracking.right: <none>
+        Result: XRT_SUCCESS
+DEBUG [comp_main_create_system_compositor] Doing init 0x589c97070590
+ WARN [compositor_check_and_prepare_xdev] Had to fill in meshuv on xdev 'HTC Vive Pro (vive)', this should be done in the driver.
+ INFO [compositor_init_window_pre_vulkan] Selected Vulkan Display Direct-Mode backend!
+DEBUG [vk_build_instance_extensions] Using optional instance ext VK_EXT_swapchain_colorspace
+DEBUG [select_physical_device] Choosing Vulkan device index
+DEBUG [select_physical_device] Available GPUs
+DEBUG [vk_print_device_info] GPU index 1
+        name: llvmpipe (LLVM 20.1.2, 256 bits)
+        vendor: 0x10005
+        product: 0x0000
+        apiVersion: 1.4.318
+        driverVersion: 0x06402008
+DEBUG [vk_print_device_info] Selected GPU: 0
+        name: NVIDIA GeForce RTX 5060 Ti
+        vendor: 0x10de
+        product: 0x2d04
+        apiVersion: 1.4.312
+        driverVersion: 0x9129c200
+DEBUG [build_device_extensions] Using required device ext VK_KHR_swapchain
+DEBUG [build_device_extensions] Using required device ext VK_KHR_dedicated_allocation
+DEBUG [build_device_extensions] Using required device ext VK_KHR_external_fence
+DEBUG [build_device_extensions] Using required device ext VK_KHR_external_memory
+DEBUG [build_device_extensions] Using required device ext VK_KHR_external_semaphore
+DEBUG [build_device_extensions] Using required device ext VK_KHR_get_memory_requirements2
+DEBUG [build_device_extensions] Using required device ext VK_KHR_external_memory_fd
+DEBUG [build_device_extensions] NOT using optional device ext VK_GOOGLE_display_timing
+DEBUG [build_device_extensions] Using optional device ext VK_EXT_global_priority
+DEBUG [build_device_extensions] Using optional device ext VK_KHR_external_semaphore_fd
+DEBUG [build_device_extensions] Using optional device ext VK_KHR_external_fence_fd
+DEBUG [build_device_extensions] Using optional device ext VK_KHR_format_feature_flags2
+DEBUG [build_device_extensions] Using optional device ext VK_KHR_global_priority
+DEBUG [build_device_extensions] Using optional device ext VK_KHR_image_format_list
+DEBUG [build_device_extensions] Using optional device ext VK_KHR_maintenance1
+DEBUG [build_device_extensions] Using optional device ext VK_KHR_maintenance2
+DEBUG [build_device_extensions] Using optional device ext VK_KHR_timeline_semaphore
+DEBUG [build_device_extensions] Using optional device ext VK_EXT_calibrated_timestamps
+DEBUG [build_device_extensions] Using optional device ext VK_EXT_robustness2
+DEBUG [should_skip_optional_device_ext] Skipping optional instance extension VK_EXT_display_control because VK_EXT_display_surface_counter instance ext is not enabled
+DEBUG [filter_device_features] Features:
+        null_descriptor: 0
+        shader_storage_image_write_without_format: 1
+        timeline_semaphore: 1
+ INFO [create_device] Created device and GRAPHICS queue with QUEUE_GLOBAL_PRIORITY_REALTIME.
+ INFO [vk_print_device_info] Device info:
+        name: NVIDIA GeForce RTX 5060 Ti
+        vendor: 0x10de
+        product: 0x2d04
+        apiVersion: 1.4.312
+        driverVersion: 0x9129c200
+ INFO [vk_print_features_info] Features:
+        timestamp_compute_and_graphics: true
+        timestamp_period: 1.000000
+        timestamp_valid_bits: 64
+        timeline_semaphore: true
+ INFO [vk_print_external_handles_info] Supported images:
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT:
+                color import=true export=true
+                depth import=true export=true
+ INFO [vk_print_external_handles_info] Supported fences:
+        VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT: true
+        VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_FD_BIT: true
+ INFO [vk_print_external_handles_info] Supported semaphores:
+        VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT(binary): true
+        VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT(binary): true
+        VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT(timeline): false
+        VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT(timeline): true
+DEBUG [fill_in_results] Selected 0 with uuid: 5c c0 ed 67 67 36 43 69 df 65 d9 df 80 22 de dd
+DEBUG [fill_in_results] Suggest 0 with uuid: 5c c0 ed 67 67 36 43 69 df 65 d9 df 80 22 de dd to clients
+DEBUG [render_shaders_load] Shaders loaded!
+ INFO [render_resources_init] New renderer initialized!
+DEBUG [compositor_try_window] Target backend VkDisplayKHR initialized!
+DEBUG [comp_window_vk_display_init_swapchain] Will use display: HTC Corporation VIVE Pro (DP-4)
+DEBUG [comp_window_direct_create_surface] Found 4 plane properties.
+DEBUG [comp_window_direct_get_primary_display_mode] Found 2 modes
+ INFO [print_modes] Available Vk modes for direct mode
+ INFO [print_modes] |  0 | 2880x1600@90.04
+ INFO [print_modes] |  1 | 2880x1600@90.04
+ INFO [print_modes] Listed 2 modes
+DEBUG [comp_window_direct_get_primary_display_mode] Using manually chosen mode 0
+DEBUG [comp_window_direct_get_primary_display_mode] found display mode 2880x1600@90.04
+DEBUG [comp_window_direct_get_primary_display_mode] Updating compositor settings nominal frame interval from 11111111 (90.000001 Hz) to 11106051 (90.041000 Hz)
+DEBUG [renderer_ensure_images_and_renderings] Creating images and renderings (force_recreate: false).
+ INFO [u_pc_fake_create] Created fake timing
+DEBUG [find_surface_format] VkSurfaceKHR returned VkSurfaceFormatKHR:
+        0 [VK_FORMAT_A8B8G8R8_UNORM_PACK32, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR]
+        1 [VK_FORMAT_A8B8G8R8_SRGB_PACK32, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR]
+        2 [VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR]
+        3 [VK_FORMAT_A1R5G5B5_UNORM_PACK16, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR]
+        4 [VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR]
+DEBUG [find_surface_format] VkSurfaceFormatKHR
+        picked: [format = VK_FORMAT_A8B8G8R8_UNORM_PACK32, colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR]
+        preferred: [format = VK_FORMAT_B8G8R8A8_SRGB, colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR]
+DEBUG [comp_target_swapchain_create_images] swapchain minImageCount 2 maxImageCount 8
+DEBUG [comp_target_swapchain_create_images] Creating compositor swapchain with 3 images
+DEBUG [create_image_views] Creating 3 image views.
+ INFO [comp_target_swapchain_create_images] Not using vblank event thread!
+DEBUG [renderer_create_renderings_and_fences] Allocating 3 Command Buffers.
+DEBUG [comp_main_create_system_compositor] Done 0x589c97070590
+DEBUG [is_format_supported] Format 'VK_FORMAT_R16G16B16_UNORM' cannot be sampled from in optimal layout!
+DEBUG [is_format_supported] Format 'VK_FORMAT_R16G16B16_SFLOAT' cannot be sampled from in optimal layout!
+DEBUG [is_format_supported] Format 'VK_FORMAT_R8G8B8_SRGB' cannot be sampled from in optimal layout!
+DEBUG [is_format_supported] Format 'VK_FORMAT_R8G8B8_UNORM' cannot be sampled from in optimal layout!
+DEBUG [is_format_supported] Format 'VK_FORMAT_B8G8R8_UNORM' cannot be sampled from in optimal layout!
+ INFO [comp_vulkan_formats_log] Supported formats:
+        VK_FORMAT_R16G16B16A16_UNORM: true
+        VK_FORMAT_R16G16B16A16_SFLOAT: true
+        VK_FORMAT_R16G16B16_UNORM: false
+        VK_FORMAT_R16G16B16_SFLOAT: false
+        VK_FORMAT_R8G8B8A8_SRGB: true
+        VK_FORMAT_B8G8R8A8_SRGB: true
+        VK_FORMAT_R8G8B8_SRGB: false
+        VK_FORMAT_R8G8B8A8_UNORM: true
+        VK_FORMAT_B8G8R8A8_UNORM: true
+        VK_FORMAT_R8G8B8_UNORM: false
+        VK_FORMAT_B8G8R8_UNORM: false
+        VK_FORMAT_R5G6B5_UNORM_PACK16: true
+        VK_FORMAT_R32_SFLOAT: true
+        VK_FORMAT_D32_SFLOAT: true
+        VK_FORMAT_D16_UNORM: true
+        VK_FORMAT_X8_D24_UNORM_PACK32: true
+        VK_FORMAT_D24_UNORM_S8_UINT: true
+        VK_FORMAT_D32_SFLOAT_S8_UINT: true
+        VK_FORMAT_S8_UINT: true
+DEBUG [compositor_begin_session] BEGIN_SESSION
+ INFO [update_session_state_locked] Doing warm start, 0 active app session(s).
+DEBUG [create_listen_socket] Created listening socket /run/user/1000/monado_comp_ipc.
+DEBUG [init_listen_socket] Listening socket is fd 58
+DEBUG [compositor_end_session] END_SESSION
+ INFO [update_session_state_locked] Stopped native session, 0 active app session(s).
+

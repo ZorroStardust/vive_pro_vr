@@ -1,0 +1,18 @@
+[36mDEBUG [0m[u_metrics_init] No metrics file!
+[32m INFO [0m[ipc_server_main] Monado Service GIT-NOTFOUND starting up...
+[32m INFO [0m[is_json_ok] No config file was loaded!
+[32m INFO [0m[is_json_ok] No config file was loaded!
+[31mERROR [0m[init_valve_index] Valve Index manufacturer string did not match.
+[31mERROR [0m[vive_found] Failed after opening Vive device?
+[33m WARN [0m[vive_get_imu_range_report] Gyroscope or accelerometer range too large.
+[33m WARN [0m[vive_get_imu_range_report] Gyroscope: 177
+[33m WARN [0m[vive_get_imu_range_report] Accelerometer: 112
+[33m WARN [0m[_is_report_size_valid] Wrong size 58 for report VIVE_CONTROLLER_LIGHTHOUSE_PULSE_REPORT_ID (21). Expected 30.
+[33m WARN [0m[_is_report_size_valid] Wrong size 58 for report VIVE_CONTROLLER_LIGHTHOUSE_PULSE_REPORT_ID (21). Expected 30.
+[33m WARN [0m[_is_report_size_valid] Wrong size 58 for report VIVE_CONTROLLER_LIGHTHOUSE_PULSE_REPORT_ID (21). Expected 30.
+[33m WARN [0m[_is_report_size_valid] Wrong size 58 for report VIVE_CONTROLLER_LIGHTHOUSE_PULSE_REPORT_ID (21). Expected 30.
+[33m WARN [0m[_is_report_size_valid] Wrong size 58 for report VIVE_CONTROLLER_LIGHTHOUSE_PULSE_REPORT_ID (21). Expected 30.
+[33m WARN [0m[_is_report_size_valid] Wrong size 58 for report VIVE_CONTROLLER_LIGHTHOUSE_PULSE_REPORT_ID (21). Expected 30.
+[33m WARN [0m[_is_report_size_valid] Wrong size 58 for report VIVE_CONTROLLER_LIGHTHOUSE_PULSE_REPORT_ID (21). Expected 30.
+[33m WARN [0m[_is_report_size_valid] Wrong size 58 for report VIVE_CONTROLLER_LIGHTHOUSE_PULSE_REPORT_ID (21). Expected 30.
+*** buffer overflow detected ***: terminated

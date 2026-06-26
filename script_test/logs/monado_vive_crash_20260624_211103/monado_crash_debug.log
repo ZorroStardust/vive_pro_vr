@@ -1,0 +1,842 @@
+XRT_METRICS_FILE=(null) (nil)
+XRT_LOG=debug (debug)
+DEBUG [u_metrics_init] No metrics file!
+ INFO [ipc_server_main] Monado Service GIT-NOTFOUND starting up...
+OXR_DEBUG_GUI=FALSE (nil)
+IPC_EXIT_ON_DISCONNECT=FALSE (nil)
+IPC_LOG=warn (nil)
+PROBER_LOG=debug (debug)
+XRT_TRACK_VARIABLES=FALSE (nil)
+SIMULATED_ENABLE=FALSE (nil)
+PSVR_ENABLE=TRUE (nil)
+PSVR_LOG=warn (nil)
+ARDUINO_ENABLE=TRUE (nil)
+DAYDREAM_ENABLE=TRUE (nil)
+QWERTY_ENABLE=FALSE (nil)
+P_OVERRIDE_ACTIVE_CONFIG=(null) (nil)
+ INFO [is_json_ok] No config file was loaded!
+ INFO [is_json_ok] No config file was loaded!
+VIVE_OVER_SURVIVE=FALSE (nil)
+VIVE_SLAM=FALSE (nil)
+LH_HANDTRACKING=AUTO (nil)
+VIVE_LOG=debug (debug)
+DEBUG [vive_source_create] Vive source created
+VIVE_LOG=debug (debug)
+ INFO [log_vive_device] ====== vive device ======
+ INFO [log_vive_device] Vendor:   28de
+ INFO [log_vive_device] Product:  2300
+ INFO [log_vive_device] Class:    0
+ INFO [log_vive_device] Bus type: XRT_BUS_TYPE_USB
+ INFO [log_vive_string] XRT_PROBER_STRING_MANUFACTURER: Valve
+ INFO [log_vive_string] XRT_PROBER_STRING_PRODUCT: LHR
+ INFO [log_vive_string] XRT_PROBER_STRING_SERIAL_NUMBER: LHR-27FCBBDE
+ INFO [log_vive_device] ====== vive device ======
+ INFO [log_vive_device] Vendor:   28de
+ INFO [log_vive_device] Product:  2300
+ INFO [log_vive_device] Class:    0
+ INFO [log_vive_device] Bus type: XRT_BUS_TYPE_USB
+ INFO [log_vive_string] XRT_PROBER_STRING_MANUFACTURER: Valve
+ INFO [log_vive_string] XRT_PROBER_STRING_PRODUCT: LHR
+ INFO [log_vive_string] XRT_PROBER_STRING_SERIAL_NUMBER: LHR-27FCBBDE
+ERROR [init_valve_index] Valve Index manufacturer string did not match.
+ERROR [vive_found] Failed after opening Vive device?
+DEBUG [vive_source_create] Vive source created
+ INFO [log_vive_device] ====== vive device ======
+ INFO [log_vive_device] Vendor:   0bb4
+ INFO [log_vive_device] Product:  0309
+ INFO [log_vive_device] Class:    0
+ INFO [log_vive_device] Bus type: XRT_BUS_TYPE_USB
+ INFO [log_vive_string] XRT_PROBER_STRING_MANUFACTURER: HTC
+ INFO [log_vive_string] XRT_PROBER_STRING_PRODUCT: VIVE Pro
+ INFO [log_vive_string] XRT_PROBER_STRING_SERIAL_NUMBER: 207136544653
+ INFO [log_vive_device] ====== vive device ======
+ INFO [log_vive_device] Vendor:   0bb4
+ INFO [log_vive_device] Product:  0309
+ INFO [log_vive_device] Class:    0
+ INFO [log_vive_device] Bus type: XRT_BUS_TYPE_USB
+ INFO [log_vive_string] XRT_PROBER_STRING_MANUFACTURER: HTC
+ INFO [log_vive_string] XRT_PROBER_STRING_PRODUCT: VIVE Pro
+ INFO [log_vive_string] XRT_PROBER_STRING_SERIAL_NUMBER: 207136544653
+ INFO [log_vive_device] ====== vive device ======
+ INFO [log_vive_device] Vendor:   28de
+ INFO [log_vive_device] Product:  2300
+ INFO [log_vive_device] Class:    0
+ INFO [log_vive_device] Bus type: XRT_BUS_TYPE_USB
+ INFO [log_vive_string] XRT_PROBER_STRING_MANUFACTURER: Valve
+ INFO [log_vive_string] XRT_PROBER_STRING_PRODUCT: LHR
+ INFO [log_vive_string] XRT_PROBER_STRING_SERIAL_NUMBER: LHR-27FCBBDE
+VIVE_LOG=debug (debug)
+DEBUG [vive_mainboard_power_on] Power on: 64
+ INFO [vive_mainboard_get_device_info] EDID Manufacturer ID: HVR, Product code: 0xaa02
+ INFO [vive_mainboard_get_device_info] Display firmware version: 2105637
+ INFO [vive_device_create] Firmware version 0
+ INFO [vive_device_create] Hardware revision: 0 rev 0.0.0
+ WARN [vive_get_imu_range_report] Gyroscope or accelerometer range too large.
+ WARN [vive_get_imu_range_report] Gyroscope: 177
+ WARN [vive_get_imu_range_report] Accelerometer: 112
+ INFO [vive_device_create] Vive gyroscope range     0.000000
+ INFO [vive_device_create] Vive accelerometer range 0.000000
+DEBUG [vive_config_parse] JSON config:
+{
+    "device": {
+        "eye_target_height_in_pixels": 1600,
+        "eye_target_width_in_pixels": 1440,
+        "first_eye": "eEYE_LEFT",
+        "last_eye": "eEYE_RIGHT",
+        "num_windows": 1,
+        "persistence": 0.011110999621450901,
+        "physical_aspect_x_over_y": 0.8999999761581421
+    },
+    "device_class": "hmd",
+    "device_pid": 8960,
+    "device_serial_number": "LHR-27FCBBDE",
+    "device_vid": 10462,
+    "direct_mode_edid_pid": 43522,
+    "direct_mode_edid_vid": 53794,
+    "display_edid": [
+        "",
+        ""
+    ],
+    "display_gc": {
+        "black_clamp": 0.0117647061124444
+    },
+    "display_mc": {
+        "left": "Green_4BPA10BH003572_mura_analyzes.mc",
+        "offset": -0.49803921580314636,
+        "right": "Green_4BNA10BH000289_mura_analyzes.mc",
+        "scale": 0.125,
+        "type": 1
+    },
+    "head": {
+        "plus_x": [
+            -1,
+            0,
+            0
+        ],
+        "plus_z": [
+            0,
+            0,
+            -1
+        ],
+        "position": [
+            -9.99999993922529e-09,
+            0,
+            -0.02163054794073105
+        ]
+    },
+    "htcComposeTime": "2020-12-07 15:55:14.174000",
+    "imu": {
+        "acc_bias": [
+            -0.01587,
+            0.03943,
+            0.3348
+        ],
+        "acc_scale": [
+            0.9995,
+            1.001,
+            0.9947
+        ],
+        "gyro_bias": [
+            -0.009323,
+            0.01098,
+            0.01108
+        ],
+        "gyro_scale": [
+            1.0,
+            1.0,
+            1.0
+        ],
+        "plus_x": [
+            1,
+            0,
+            0
+        ],
+        "plus_z": [
+            0,
+            0,
+            1
+        ],
+        "position": [
+            0.01348728034645319,
+            0.01901238039135933,
+            0.04510498046875
+        ]
+    },
+    "l_revision": 3345,
+    "lighthouse_config": {
+        "channelMap": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+        ],
+        "modelNormals": [
+            [
+                -0.9160568714141846,
+                -0.221717968583107,
+                -0.33418697118759155
+            ],
+            [
+                -0.8395431637763977,
+                -0.3784070909023285,
+                -0.38984009623527527
+            ],
+            [
+                -0.9841577410697937,
+                -0.12382596731185913,
+                -0.12688897550106049
+            ],
+            [
+                -0.5945847034454346,
+                -0.20033690333366394,
+                0.7786746621131897
+            ],
+            [
+                -0.5172799229621887,
+                -0.823249876499176,
+                -0.2338399738073349
+            ],
+            [
+                -0.4268380105495453,
+                -0.4614129960536957,
+                0.777758002281189
+            ],
+            [
+                -0.46672800183296204,
+                -0.8824229836463928,
+                0.05911700055003166
+            ],
+            [
+                -0.09325094521045685,
+                -0.5597506165504456,
+                0.8233975172042847
+            ],
+            [
+                0.09325094521045685,
+                -0.5597506165504456,
+                0.8233975172042847
+            ],
+            [
+                0.46672800183296204,
+                -0.8824229836463928,
+                0.05911700055003166
+            ],
+            [
+                0.4268380105495453,
+                -0.4614129960536957,
+                0.777758002281189
+            ],
+            [
+                0.5172799229621887,
+                -0.823249876499176,
+                -0.2338399738073349
+            ],
+            [
+                0.5945847034454346,
+                -0.20033690333366394,
+                0.7786746621131897
+            ],
+            [
+                0.9841577410697937,
+                -0.12382596731185913,
+                -0.12688897550106049
+            ],
+            [
+                0.8395431637763977,
+                -0.3784070909023285,
+                -0.38984009623527527
+            ],
+            [
+                0.9160568714141846,
+                -0.221717968583107,
+                -0.33418697118759155
+            ],
+            [
+                -0.09325094521045685,
+                0.5597506165504456,
+                0.8233975172042847
+            ],
+            [
+                -0.46672800183296204,
+                0.8824229836463928,
+                0.05911700055003166
+            ],
+            [
+                -0.4268380105495453,
+                0.4614129960536957,
+                0.777758002281189
+            ],
+            [
+                -0.5816779136657715,
+                0.7789269089698792,
+                -0.23435796797275543
+            ],
+            [
+                -0.8395431637763977,
+                0.3784070909023285,
+                -0.38984009623527527
+            ],
+            [
+                -0.9841577410697937,
+                0.12382596731185913,
+                -0.12688897550106049
+            ],
+            [
+                -0.5945847034454346,
+                0.20033690333366394,
+                0.7786746621131897
+            ],
+            [
+                -0.6011760234832764,
+                0.03613999858498573,
+                0.7982990145683289
+            ],
+            [
+                0.6011760234832764,
+                0.03613999858498573,
+                0.7982990145683289
+            ],
+            [
+                0.5945847034454346,
+                0.20033690333366394,
+                0.7786746621131897
+            ],
+            [
+                0.9841577410697937,
+                0.12382596731185913,
+                -0.12688897550106049
+            ],
+            [
+                0.8395431637763977,
+                0.3784070909023285,
+                -0.38984009623527527
+            ],
+            [
+                0.5816779136657715,
+                0.7789269089698792,
+                -0.23435796797275543
+            ],
+            [
+                0.4268380105495453,
+                0.4614129960536957,
+                0.777758002281189
+            ],
+            [
+                0.46672800183296204,
+                0.8824229836463928,
+                0.05911700055003166
+            ],
+            [
+                0.09325094521045685,
+                0.5597506165504456,
+                0.8233975172042847
+            ]
+        ],
+        "modelPoints": [
+            [
+                -0.09043163061141968,
+                -0.0011097810929641128,
+                0.025212861597537994
+            ],
+            [
+                -0.08596450835466385,
+                -0.02728482149541378,
+                0.01991935819387436
+            ],
+            [
+                -0.08974561095237732,
+                -0.021529192104935646,
+                0.03215080127120018
+            ],
+            [
+                -0.08386871963739395,
+                -0.010180477052927017,
+                0.042559914290905
+            ],
+            [
+                -0.0723760575056076,
+                -0.04681343957781792,
+                0.03128073737025261
+            ],
+            [
+                -0.06127284839749336,
+                -0.03404005244374275,
+                0.04568718001246452
+            ],
+            [
+                -0.03427257761359215,
+                -0.05102597177028656,
+                0.032557807862758636
+            ],
+            [
+                -0.02215481922030449,
+                -0.027411771938204765,
+                0.05109411105513573
+            ],
+            [
+                0.022232893854379654,
+                -0.027348428964614868,
+                0.0511554554104805
+            ],
+            [
+                0.034119345247745514,
+                -0.05106822028756142,
+                0.032764676958322525
+            ],
+            [
+                0.0612172856926918,
+                -0.03386561572551727,
+                0.04570705071091652
+            ],
+            [
+                0.07259377092123032,
+                -0.04679383337497711,
+                0.03146923705935478
+            ],
+            [
+                0.08370602130889893,
+                -0.009998729452490807,
+                0.04257243499159813
+            ],
+            [
+                0.08984449505805969,
+                -0.021370721980929375,
+                0.03226955607533455
+            ],
+            [
+                0.08596919476985931,
+                -0.027209725230932236,
+                0.020131191238760948
+            ],
+            [
+                0.09035741537809372,
+                -0.0011290280381217599,
+                0.025150271132588387
+            ],
+            [
+                -0.022484278306365013,
+                0.03432903811335564,
+                0.051374614238739014
+            ],
+            [
+                -0.03421294689178467,
+                0.05783555656671524,
+                0.03249593451619148
+            ],
+            [
+                -0.058315958827733994,
+                0.04319467768073082,
+                0.04581257328391075
+            ],
+            [
+                -0.07222151756286621,
+                0.05239575728774071,
+                0.03193211555480957
+            ],
+            [
+                -0.08732534945011139,
+                0.034350764006376266,
+                0.021984711289405823
+            ],
+            [
+                -0.08984720706939697,
+                0.02853585220873356,
+                0.03202333673834801
+            ],
+            [
+                -0.08393640071153641,
+                0.017007339745759964,
+                0.042704224586486816
+            ],
+            [
+                -0.06290273368358612,
+                0.004054104909300804,
+                0.050287261605262756
+            ],
+            [
+                0.06248282641172409,
+                0.0039450498297810555,
+                0.05033378303050995
+            ],
+            [
+                0.08384102582931519,
+                0.01700199581682682,
+                0.042513035237789154
+            ],
+            [
+                0.08977024257183075,
+                0.0285468902438879,
+                0.03188721835613251
+            ],
+            [
+                0.08744073659181595,
+                0.034400757402181625,
+                0.021903280168771744
+            ],
+            [
+                0.0727260410785675,
+                0.052243009209632874,
+                0.031693290919065475
+            ],
+            [
+                0.0582282729446888,
+                0.043077871203422546,
+                0.045642197132110596
+            ],
+            [
+                0.03452395275235176,
+                0.057834967970848083,
+                0.03255719691514969
+            ],
+            [
+                0.02227969467639923,
+                0.03443606570363045,
+                0.051109638065099716
+            ]
+        ]
+    },
+    "manufacturer": "HTC",
+    "mb_serial_number": "42Y630B201166",
+    "model_number": "VIVE_Pro MV",
+    "display_usb_protocol": "htc",
+    "display_usb_vid": 2996,
+    "display_usb_pid": 777,
+    "input_profile": "vive_pro",
+    "registered_device_type_prefix": "htc/vive_pro",
+    "render_model": "",
+    "resource_root": "",
+    "revision": 1,
+    "seconds_from_photons_to_vblank": 0.011,
+    "seconds_from_vsync_to_photons": 0.0004,
+    "tracked_controller_role": "",
+    "tracking_to_eye_transform": [
+        {
+            "distortion": {
+                "center_x": 0.09017573755230046,
+                "center_y": 0.010953428392930517,
+                "coeffs": [
+                    -0.20564625560821023,
+                    -0.03588889498860274,
+                    -0.025906979778481422,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "type": "DISTORT_DPOLY3"
+            },
+            "distortion_blue": {
+                "center_x": 0.09017573755230046,
+                "center_y": 0.010953428392930517,
+                "coeffs": [
+                    -0.25845439558583505,
+                    0.048527425199905716,
+                    -0.07157542856222837,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "type": "DISTORT_DPOLY3"
+            },
+            "distortion_red": {
+                "center_x": 0.09017573755230046,
+                "center_y": 0.010953428392930517,
+                "coeffs": [
+                    -0.16940222538434946,
+                    -0.08759678680267192,
+                    -0.00014345924389134264,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "type": "DISTORT_DPOLY3"
+            },
+            "extrinsics": [
+                [
+                    1,
+                    0,
+                    0,
+                    0.03109734132885933
+                ],
+                [
+                    0,
+                    1,
+                    0,
+                    -2.2351741790771484e-08
+                ],
+                [
+                    0,
+                    0,
+                    1,
+                    -7.450580596923828e-09
+                ]
+            ],
+            "grow_for_undistort": 0.6000000238418579,
+            "intrinsics": [
+                [
+                    1.2516008615493774,
+                    0,
+                    -0.09017574042081833
+                ],
+                [
+                    0,
+                    1.1255398988723755,
+                    0.00985808577388525
+                ],
+                [
+                    0,
+                    0,
+                    -1
+                ]
+            ],
+            "undistort_r2_cutoff": 1.1614923477172852
+        },
+        {
+            "distortion": {
+                "center_x": -0.0882175296020675,
+                "center_y": 0.0041997001777329184,
+                "coeffs": [
+                    -0.20128174617227054,
+                    -0.03807213352473394,
+                    -0.024799187755055692,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "type": "DISTORT_DPOLY3"
+            },
+            "distortion_blue": {
+                "center_x": -0.0882175296020675,
+                "center_y": 0.0041997001777329184,
+                "coeffs": [
+                    -0.2505276962807156,
+                    0.04387753045318384,
+                    -0.07304529830436202,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "type": "DISTORT_DPOLY3"
+            },
+            "distortion_red": {
+                "center_x": -0.0882175296020675,
+                "center_y": 0.0041997001777329184,
+                "coeffs": [
+                    -0.16314770990212263,
+                    -0.09624532246065096,
+                    0.0059666382693008835,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "type": "DISTORT_DPOLY3"
+            },
+            "extrinsics": [
+                [
+                    1,
+                    0,
+                    0,
+                    -0.031097378581762314
+                ],
+                [
+                    0,
+                    1,
+                    0,
+                    -2.2351741790771484e-08
+                ],
+                [
+                    0,
+                    0,
+                    1,
+                    -7.450580596923828e-09
+                ]
+            ],
+            "grow_for_undistort": 0.6000000238418579,
+            "intrinsics": [
+                [
+                    1.2504122257232666,
+                    0,
+                    0.08821752667427063
+                ],
+                [
+                    0,
+                    1.12540602684021,
+                    0.003779730061069131
+                ],
+                [
+                    0,
+                    0,
+                    -1
+                ]
+            ],
+            "undistort_r2_cutoff": 1.0919522047042847
+        }
+    ],
+    "tracked_cameras":
+[
+{
+"name": "right",
+"intrinsics":
+{
+"center_x" :306.669941,
+"center_y" :222.341113,
+"distort" :
+{
+"center_x" :0.000000,
+"center_y" :0.000000,
+"coeffs" :[0.000884, 0.011282, -0.013922, 0.006528, 0.000000, 0.000000, 0.000000, 0.000000],
+"type" :"DISTORT_FTHETA"
+},
+"focal_x":275.841654,
+"focal_y":275.584443,
+"width": 612,
+"height": 460
+},
+"extrinsics": [0, 0, 0, 1, 0, 0, 0]
+},
+{
+"name": "left",
+"intrinsics":
+{
+"center_x" :301.178518,
+"center_y" :227.919980,
+"distort" :
+{
+"center_x" :0.000000,
+"center_y" :0.000000,
+"coeffs" :[0.007897, -0.010001, 0.010713, -0.003099, 0.000000, 0.000000, 0.000000, 0.000000],
+"type" :"DISTORT_FTHETA"
+},
+"focal_x":275.827420,
+"focal_y":275.812855,
+"width": 612,
+"height": 460
+},
+"extrinsics": [0, 0, 0, 1, 0, 0, 0]
+}
+],
+"tracked_camera":
+{
+"version":"2.1.9.2",
+"head_from_camera": [
+			0,
+			0,
+			0,
+			1,
+			0,
+			0,
+			0
+		],
+"pitch" :-1.9161259755492210e-02,
+"yaw" :5.7226237840950489e-03,
+"roll" :-2.3421591147780418e-02,
+"intrinsics":
+{
+"width" :612,
+"height" :460,
+"center_x" :3.0117851793127898e+02,
+"center_y" :2.2791997980205556e+02,
+"focal_x" :2.7582741965825329e+02,
+"focal_y" :2.7581285549076642e+02,
+"distort":
+{
+"center_x" :0.0000000000000000e+00,
+"center_y" :0.0000000000000000e+00,
+"coeffs" :[7.8969088528924557e-03, -1.0001494996160043e-02, 1.0713171899091229e-02, -3.0987086881838367e-03, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00],
+"type" :"DISTORT_FTHETA"
+}
+}
+},
+"second_tracked_camera":
+{
+"version":"2.1.9.2",
+"pitch" :-1.7616672441363335e-02,
+"yaw" :2.8574103489518166e-03,
+"roll" :-2.4452846497297287e-02,
+"intrinsics":
+{
+"width" :612,
+"height" :460,
+"center_x" :3.0666994099998846e+02,
+"center_y" :2.2234111279325899e+02,
+"focal_x" :2.7584165431358161e+02,
+"focal_y" :2.7558444272050167e+02,
+"distort":
+{
+"center_x" :0.0000000000000000e+00,
+"center_y" :0.0000000000000000e+00,
+"coeffs" :[8.8415497109724348e-04, 1.1282107499622610e-02, -1.3922255617670567e-02, 6.5284001473130916e-03, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00],
+"type" :"DISTORT_FTHETA"
+}
+}
+},
+"dual_extrinsics":
+{
+"rotation" :[9.9999908370996859e-01, 1.1205063360133632e-03, 7.5963463206984170e-04, -1.1217856656135024e-03, 9.9999794982023527e-01, 1.6858090777327360e-03, -7.5774411492933891e-04, -1.6866596802840622e-03, 9.9999829050002831e-01],
+"translation" :[-6.4869953986481647e+01, 4.5914173939928526e-02, 8.9233512251190958e-02],
+"type" :"DUAL_CAMERA"
+},
+"type": "Lighthouse_HMD"
+}
+
+DEBUG [vive_config_parse] Parsing model number: VIVE_Pro MV
+DEBUG [vive_config_parse] Found HTC Vive Pro HMD
+DEBUG [vive_config_parse] = Vive configuration =
+DEBUG [vive_config_parse] lens_separation: 0.000000
+DEBUG [vive_config_parse] persistence: 0.011111
+DEBUG [vive_config_parse] physical_aspect_x_over_y: 0.900000
+DEBUG [vive_config_parse] model_number: VIVE_Pro MV
+DEBUG [vive_config_parse] mb_serial_number: 42Y630B201166
+DEBUG [vive_config_parse] device_serial_number: LHR-27FCBBDE
+DEBUG [vive_config_parse] eye_target_height_in_pixels: 1600
+DEBUG [vive_config_parse] eye_target_width_in_pixels: 1440
+DEBUG [_print_vec3] acc_bias = -0.015870 0.039430 0.334800
+DEBUG [_print_vec3] acc_scale = 0.999500 1.001000 0.994700
+DEBUG [_print_vec3] gyro_bias = -0.009323 0.010980 0.011080
+DEBUG [_print_vec3] gyro_scale = 1.000000 1.000000 1.000000
+DEBUG [vive_config_parse] grow_for_undistort: 0.600000
+DEBUG [vive_config_parse] undistort_r2_cutoff 0: 1.161492
+DEBUG [vive_config_parse] undistort_r2_cutoff 1: 1.091952
+MATH_DEBUG_VIEWS=FALSE (nil)
+VIVE_LOG=debug (debug)
+DEBUG [vive_device_create] Successfully enabled watchman receiver.
+*** buffer overflow detected ***: terminated

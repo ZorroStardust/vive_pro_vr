@@ -1,0 +1,11 @@
+started at 2026年 06月 24日 星期三 14:53:48 CST
+LOGDIR=/home/zorro/vive_windowed_test_20260624_145348
+XR_RUNTIME_JSON=/usr/share/openxr/1/openxr_monado.json
+XDG_RUNTIME_DIR=/run/user/1000
+WAYLAND_DISPLAY=wayland-0
+DISPLAY=:1
+APP_CMD=hello_xr -g Vulkan -ff Hmd -vc Stereo -s Local -v
+[wait socket]
+Monado IPC socket ready after 2s
+[run client]
+hello_xr -g Vulkan -ff Hmd -vc Stereo -s Local -v

@@ -1,0 +1,18 @@
+[monado] starting at 2026年 06月 24日 星期三 21:02:48 CST
+[monado] XR_RUNTIME_JSON=/usr/share/openxr/1/openxr_monado.json
+[monado] XDG_RUNTIME_DIR=/run/user/1000
+[monado] WAYLAND_DISPLAY=wayland-0
+[monado] DISPLAY=:1
+[monado] HMD_CONNECTOR=DP-3
+DEBUG [u_metrics_init] No metrics file!
+ INFO [ipc_server_main] Monado Service GIT-NOTFOUND starting up...
+ INFO [is_json_ok] No config file was loaded!
+ INFO [is_json_ok] No config file was loaded!
+ERROR [init_valve_index] Valve Index manufacturer string did not match.
+ERROR [vive_found] Failed after opening Vive device?
+ WARN [vive_get_imu_range_report] Gyroscope or accelerometer range too large.
+ WARN [vive_get_imu_range_report] Gyroscope: 177
+ WARN [vive_get_imu_range_report] Accelerometer: 112
+*** buffer overflow detected ***: terminated
+/home/zorro/projects/vive_pro_vr/script_test/logs/helloxr_kde_vr_20260624_210247/run_monado.sh: line 49: 34569 Aborted                 (core dumped) monado-service
+[monado] exited with status=134 at 2026年 06月 24日 星期三 21:02:50 CST

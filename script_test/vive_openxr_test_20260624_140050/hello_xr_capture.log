@@ -1,0 +1,86 @@
+bash -lc "
+export XR_RUNTIME_JSON=/usr/share/openx
+r/1/openxr_monado.json
+export XDG_RUNTIME_DIR=/run/user/1000
+unset DISPLAY
+unset WAYLAND_DISPLAY
+
+echo '[hello] help:'
+hello_xr -h 2>&1 || true
+
+HELLO_ARGS='-g Vulkan'
+if hello_xr -h 2>&1 | grep -q -- '-f';
+then
+  HELLO_ARGS='-g Vulkan -f Hmd'
+fi
+
+echo '[hello] running: hello_xr' $HELLO
+_ARGS
+env XR_LOADER_DEBUG=all stdbuf -oL -eL
+timeout --foreground 90s hello_xr $HELL
+O_ARGS
+echo '[hello] exit status:' $?
+"
+~ > bash -lc "                14:00:53
+dquote> export XR_RUNTIME_JSON=/usr/sha
+re/openxr/1/openxr_monado.json
+dquote> export XDG_RUNTIME_DIR=/run/use
+r/1000
+dquote> unset DISPLAY
+dquote> unset WAYLAND_DISPLAY
+dquote>
+dquote> echo '[hello] help:'
+dquote> hello_xr -h 2>&1 || true
+dquote>
+dquote> HELLO_ARGS='-g Vulkan'
+dquote> if hello_xr -h 2>&1 | grep -q -
+- '-f'; then
+dquote>   HELLO_ARGS='-g Vulkan -f Hmd'
+
+dquote> fi
+dquote>
+dquote> echo '[hello] running: hello_xr
+' $HELLO_ARGS
+dquote> env XR_LOADER_DEBUG=all stdbuf
+-oL -eL timeout --foreground 90s hello_
+xr $HELLO_ARGS
+dquote> echo '[hello] exit status:' $?
+dquote> "
+[hello] help:
+[14:00:53.999][Info   ] HelloXr --graph
+ics|-g <Graphics API> [--formfactor|-ff
+ <Form factor>] [--viewconfig|-vc <View
+ config>] [--blendmode|-bm <Blend mode>
+] [--space|-s <Space>] [--verbose|-v]
+[14:00:53.999][Info   ] Graphics APIs:
+           D3D11, D3D12, OpenGLES, Open
+GL, Vulkan2, Vulkan
+[14:00:53.999][Info   ] Form factors:
+           Hmd, Handheld
+[14:00:53.999][Info   ] View configurat
+ions:      Mono, Stereo
+[14:00:53.999][Info   ] Environment ble
+nd modes:  Opaque, Additive, AlphaBlend
+[14:00:53.999][Info   ] Spaces:
+           View, Local, Stage
+[hello] running: hello_xr
+[14:00:54.005][Error  ] GraphicsPlugin
+parameter is required
+[14:00:54.005][Info   ] HelloXr --graph
+ics|-g <Graphics API> [--formfactor|-ff
+ <Form factor>] [--viewconfig|-vc <View
+ config>] [--blendmode|-bm <Blend mode>
+] [--space|-s <Space>] [--verbose|-v]
+[14:00:54.005][Info   ] Graphics APIs:
+           D3D11, D3D12, OpenGLES, Open
+GL, Vulkan2, Vulkan
+[14:00:54.005][Info   ] Form factors:
+           Hmd, Handheld
+[14:00:54.005][Info   ] View configurat
+ions:      Mono, Stereo
+[14:00:54.005][Info   ] Environment ble
+nd modes:  Opaque, Additive, AlphaBlend
+[14:00:54.005][Info   ] Spaces:
+           View, Local, Stage
+[hello] exit status: 0
+~ >                           14:00:54

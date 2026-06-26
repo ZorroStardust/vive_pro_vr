@@ -1,0 +1,10 @@
+export XR_RUNTIME_JSON=/usr/share/openxr/1/openxr_monado.json
+export XDG_RUNTIME_DIR=/run/user/1000
+export WAYLAND_DISPLAY=wayland-0
+export DISPLAY=:1
+export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+export HMD_CONNECTOR=DP-3
+export RUN_SECONDS=60
+export TRY_FORCE_WAYLAND_DIRECT=0
+export LOGDIR=/home/zorro/projects/vive_pro_vr/script_test/logs/helloxr_kde_vr_20260624_210247
+export PATH=/usr/local/cuda-12.8/bin:/home/zorro/.opencode/bin:/home/zorro/.pixi/bin:/home/zorro/.local/share/zinit/polaris/bin:/home/zorro/bin:/home/zorro/.local/bin:/home/zorro/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin

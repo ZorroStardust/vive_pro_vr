@@ -1,0 +1,3 @@
+Monado IPC socket is ready.
+Starting hello_xr...
+hello_xr exit status: 124

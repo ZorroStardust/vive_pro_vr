@@ -1,0 +1,349 @@
+Monado IPC socket ready after 3s
+
+=== summary ===
+ERROR [init_valve_index] Valve Index manufacturer string did not match.
+ERROR [vive_found] Failed after opening Vive device?
+ERROR [vive_controller_create] Could not get Vive controller config
+ERROR [vive_controller_create] Could not get Vive controller config
+DEBUG [fill_in_results] Suggest 0 with uuid: 5c c0 ed 67 67 36 43 69 df 65 d9 df 80 22 de dd to clients
+DEBUG [comp_window_vk_display_init_swapchain] Will use display: HTC Corporation VIVE Pro (DP-4)
+ INFO [print_modes] |  0 | 2880x1600@90.04
+ INFO [print_modes] |  1 | 2880x1600@90.04
+DEBUG [comp_window_direct_get_primary_display_mode] found display mode 2880x1600@90.04
+DEBUG [comp_window_direct_get_primary_display_mode] Updating compositor settings nominal frame interval from 11111111 (90.000001 Hz) to 11106051 (90.041000 Hz)
+DEBUG [compositor_begin_session] BEGIN_SESSIONDEBUG [create_listen_socket] Created listening socket /run/user/1000/monado_comp_ipc.
+ INFO [update_session_state_locked] Doing warm start, 0 active app session(s).
+DEBUG [compositor_end_session] END_SESSION
+ INFO [update_session_state_locked] Stopped native session, 0 active app session(s).
+DEBUG [compositor_begin_session] BEGIN_SESSION
+ INFO [update_session_state_locked] Started native session, 1 active app session(s).
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for completed new frame
+DEBUG [update_session_state_locked] Stopping native session, 0 active app session(s).
+DEBUG [compositor_end_session] END_SESSION
+ INFO [update_session_state_locked] Stopped native session, 0 active app session(s).
+ERROR [init_valve_index] Valve Index manufacturer string did not match.
+ERROR [vive_found] Failed after opening Vive device?
+ERROR [vive_controller_create] Could not get Vive controller config
+ERROR [vive_controller_create] Could not get Vive controller config
+ 80 22 de dd to clients
+DEBUG [comp_window_vk_display_init_swapchain] Will use display: HTC Corporation
+ INFO [print_modes] |  0 | 2880x1600@90.04
+ INFO [print_modes] |  1 | 2880x1600@90.04
+DEBUG [comp_window_direct_get_primary_display_mode] found display mode 2880x1600
+ nominal frame interval from 11111111 (90.000001 Hz) to 11106051 (90.041000 Hz)
+DEBUG [compositor_begin_session] BEGIN_SESSIONDEBUG [create_listen_socket] Creat
+ INFO [update_session_state_locked] Doing warm start, 0 active app session(s).
+DEBUG [compositor_end_session] END_SESSION
+ INFO [update_session_state_locked] Stopped native session, 0 active app session
+DEBUG [compositor_begin_session] BEGIN_SESSION
+ INFO [update_session_state_locked] Started native session, 1 active app session
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+ WARN [log_frame_time_diff] Frame late by 11.11ms!
+ WARN [wait_for_scheduled_free] Dropping old missed frame in favour for complete
+d new frame
+DEBUG [update_session_state_locked] Stopping native session, 0 active app sessio
+DEBUG [compositor_end_session] END_SESSION
+ INFO [update_session_state_locked] Stopped native session, 0 active app session
+[hello] running:
+[14:06:47.485][Verbose]   Name=XR_KHR_composition_layer_cube SpecVersion=8
+[14:06:47.485][Verbose]   Name=XR_KHR_composition_layer_cylinder SpecVersion=4
+[14:06:47.485][Verbose]   Name=XR_KHR_composition_layer_depth SpecVersion=6
+[14:06:47.485][Verbose]   Name=XR_KHR_composition_layer_equirect SpecVersion=3
+[14:06:47.485][Verbose]   Name=XR_KHR_composition_layer_equirect2 SpecVersion=1
+Verbose [GENERAL | xrEnumerateApiLayerProperties | OpenXR-Loader] : Entering loader trampoline
+Verbose [GENERAL | xrEnumerateApiLayerProperties | OpenXR-Loader] : Entering loader trampoline
+[14:06:47.485][Info   ] Available Layers: (0)
+Info [GENERAL | xrCreateInstance | OpenXR-Loader] : LoaderInstance::CreateInstance succeeded with 0 layers enabled and runtime interface - created instance = 0x00005ea09a4e3df0
+[14:06:47.492][Warning] No validation layers found in the system, skipping
+finished at 2026年 06月 24日 星期三 14:08:22 CST

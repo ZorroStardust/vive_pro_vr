@@ -1,0 +1,53 @@
+bash -lc "
+export XR_RUNTIME_JSON=/usr/share/openxr/1/openxr_monado.json
+export XDG_RUNTIME_DIR=/run/user/1000
+unset DISPLAY
+unset WAYLAND_DISPLAY
+
+echo '[hello] help:'
+hello_xr -h 2>&1 || true
+
+HELLO_ARGS='-g Vulkan'
+if hello_xr -h 2>&1 | grep -q -- '-f'; then
+  HELLO_ARGS='-g Vulkan -f Hmd'
+fi
+
+echo '[hello] running: hello_xr' $HELLO_ARGS
+env XR_LOADER_DEBUG=all stdbuf -oL -eL timeout --foreground 90s hello_xr $HELLO_ARGS
+echo '[hello] exit status:' $?
+"
+[1m[7m%[27m[1m[0m                                       [0m[27m[24m[J[0m[49m[39m[0m[49m[38;5;31m[1m[38;5;31m[38;5;39m~[0m[38;5;39m[49m[38;5;31m[0m[38;5;31m[49m[38;5;31m[0m[38;5;31m[49m [0m[38;5;31m[49m[38;5;76m>[0m[38;5;76m[49m[38;5;76m[0m[38;5;76m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[26C[0m[49m[38;5;66m14:00:53[0m[38;5;66m[49m[38;5;66m[0m[38;5;66m[49m[38;5;66m[0m[38;5;66m[49m[39m[34D[?1h=[?2004hbbash -lc "[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004heexport XR_RUNTIME_JSON=/usr/sha [K[Krre/openxr/1/openxr_monado.json[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004heexport XDG_RUNTIME_DIR=/run/use [K[Krr/1000[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004huunset DISPLAY[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004huunset WAYLAND_DISPLAY[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004h[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004heecho '[hello] help:'[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004hhhello_xr -h 2>&1 || true[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004h[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004hHHELLO_ARGS='-g Vulkan'[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004hiif hello_xr -h 2>&1 | grep -q - [K[K-- '-f'; then[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004h   HELLO_ARGS='-g Vulkan -f Hmd' [K[K[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004hffi[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004h[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004heecho '[hello] running: hello_xr [K[K'' $HELLO_ARGS[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004heenv XR_LOADER_DEBUG=all stdbuf  [K[K--oL -eL timeout --foreground 90s hello_ [K[Kxxr $HELLO_ARGS[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004heecho '[hello] exit status:' $?[?1l>[?2004l
+[0m[27m[24m[Jdquote> [K[?1h=[?2004h"[?1l>[?2004l
+[hello] help:
+[14:00:53.999][Info   ] HelloXr --graphics|-g <Graphics API> [--formfactor|-ff <Form factor>] [--viewconfig|-vc <View config>] [--blendmode|-bm <Blend mode>] [--space|-s <Space>] [--verbose|-v]
+[14:00:53.999][Info   ] Graphics APIs:            D3D11, D3D12, OpenGLES, OpenGL, Vulkan2, Vulkan
+[14:00:53.999][Info   ] Form factors:             Hmd, Handheld
+[14:00:53.999][Info   ] View configurations:      Mono, Stereo
+[14:00:53.999][Info   ] Environment blend modes:  Opaque, Additive, AlphaBlend
+[14:00:53.999][Info   ] Spaces:                   View, Local, Stage
+[hello] running: hello_xr
+[14:00:54.005][Error  ] GraphicsPlugin parameter is required
+[14:00:54.005][Info   ] HelloXr --graphics|-g <Graphics API> [--formfactor|-ff <Form factor>] [--viewconfig|-vc <View config>] [--blendmode|-bm <Blend mode>] [--space|-s <Space>] [--verbose|-v]
+[14:00:54.005][Info   ] Graphics APIs:            D3D11, D3D12, OpenGLES, OpenGL, Vulkan2, Vulkan
+[14:00:54.005][Info   ] Form factors:             Hmd, Handheld
+[14:00:54.005][Info   ] View configurations:      Mono, Stereo
+[14:00:54.005][Info   ] Environment blend modes:  Opaque, Additive, AlphaBlend
+[14:00:54.005][Info   ] Spaces:                   View, Local, Stage
+[hello] exit status: 0
+[1m[7m%[27m[1m[0m                                       [0m[27m[24m[J[0m[49m[39m[0m[49m[38;5;31m[1m[38;5;31m[38;5;39m~[0m[38;5;39m[49m[38;5;31m[0m[38;5;31m[49m[38;5;31m[0m[38;5;31m[49m [0m[38;5;31m[49m[38;5;76m>[0m[38;5;76m[49m[38;5;76m[0m[38;5;76m[49m[30m[0m[30m[49m[39m [0m[49m[39m[K[26C[0m[49m[38;5;66m14:00:54[0m[38;5;66m[49m[38;5;66m[0m[38;5;66m[49m[38;5;66m[0m[38;5;66m[49m[39m[34D[?1h=[?2004h
