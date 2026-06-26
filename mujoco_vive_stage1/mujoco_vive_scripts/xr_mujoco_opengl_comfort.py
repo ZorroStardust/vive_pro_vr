@@ -37,6 +37,8 @@ MuJoCo VR Comfort Controls
  a / d   move whole stereo scene farther / nearer
  e       reset scene comfort shift to zero
 
+ z / x   zoom out / in (wider / narrower FOV)
+
  p       toggle mono-to-both-eyes diagnostic mode
  o       toggle swap-eyes
 
@@ -47,7 +49,8 @@ Recommended workflow:
  1. Try p first. Mono-to-both-eyes should be easiest to fuse.
  2. If mono is comfortable but stereo is tiring, reduce stereo stress with a.
  3. If positive farther shift feels reversed, use --invert-scene-shift or toggle swap-eyes.
- 4. Press s to save settings for next session.
+ 4. Press z/x to adjust FOV until the scene fills the view comfortably.
+ 5. Press s to save settings for next session.
 """
 
 
@@ -663,6 +666,10 @@ class RuntimeComfortState:
     max_abs_scene_shift_px: float = 80.0
     invert_scene_shift: bool = False
 
+    # zoom > 1 means wider FOV (see more), modifying cam_fovy = original / zoom
+    zoom: float = 1.0
+    zoom_step: float = 0.1
+
     def clamp(self) -> None:
         self.scene_farther_px = max(
             -self.max_abs_scene_shift_px,
@@ -680,10 +687,17 @@ class RuntimeComfortState:
     def reset_shift(self) -> None:
         self.scene_farther_px = 0.0
 
+    def zoom_out(self) -> None:
+        self.zoom = min(self.zoom + self.zoom_step, 10.0)
+
+    def zoom_in(self) -> None:
+        self.zoom = max(self.zoom - self.zoom_step, 0.1)
+
 
 def _print_comfort_state(prefix: str, state: RuntimeComfortState, end: str = "\n") -> None:
     print(
         f"{prefix} "
+        f"ZOOM={state.zoom:.2f} "
         f"SCENE_FARTHER={state.scene_farther_px:+.1f}px "
         f"MONO={'on' if state.mono_to_both_eyes else 'off'} "
         f"SWAP={'on' if state.swap_eyes else 'off'}",
@@ -719,6 +733,12 @@ def _handle_input(reader: _StdinReader, state: RuntimeComfortState) -> bool:
     elif ch == "o":
         state.swap_eyes = not state.swap_eyes
         changed = True
+    elif ch == "z":
+        state.zoom_out()
+        changed = True
+    elif ch == "x":
+        state.zoom_in()
+        changed = True
     elif ch == "s":
         from .config_util import Calibration, ComfortConfig, save_full_config, load_calibration, _default_config_path
 
@@ -731,6 +751,8 @@ def _handle_input(reader: _StdinReader, state: RuntimeComfortState) -> bool:
             scene_shift_step_px=state.scene_shift_step_px,
             max_abs_scene_shift_px=state.max_abs_scene_shift_px,
             invert_scene_shift=state.invert_scene_shift,
+            zoom=state.zoom,
+            zoom_step=state.zoom_step,
         )
         save_full_config(cal, comfort, cfg_path)
         print(f"\r[SAVED] {cfg_path}", flush=True)
@@ -878,6 +900,9 @@ class MujocoStereoRenderer:
         self.camera.type = mujoco.mjtCamera.mjCAMERA_FIXED
         self.camera.fixedcamid = cam_id
 
+        original_fovy = float(self.model.cam_fovy[cam_id])
+        self.model.cam_fovy[cam_id] = original_fovy / max(state.zoom, 0.1)
+
         mujoco.mjv_updateScene(
             self.model,
             self.data,
@@ -887,6 +912,8 @@ class MujocoStereoRenderer:
             mujoco.mjtCatBit.mjCAT_ALL,
             self.scene,
         )
+
+        self.model.cam_fovy[cam_id] = original_fovy
 
         viewport = GL.glGetIntegerv(GL.GL_VIEWPORT)
         vp_x = int(viewport[0])
@@ -1010,6 +1037,18 @@ def parse_args():
         default=comfort.invert_scene_shift if comfort else False,
         help="Invert scene farther/nearer shift direction if it feels reversed.",
     )
+    parser.add_argument(
+        "--zoom",
+        type=float,
+        default=comfort.zoom if comfort else 1.0,
+        help="FOV zoom factor. >1 = wider FOV (see more). Modifies cam_fovy = original/zoom.",
+    )
+    parser.add_argument(
+        "--zoom-step",
+        type=float,
+        default=comfort.zoom_step if comfort else 0.1,
+        help="Keyboard zoom adjustment step.",
+    )
 
     parser.add_argument(
         "--clear-rgb",
@@ -1086,6 +1125,8 @@ def main() -> int:
         scene_shift_step_px=args.scene_shift_step_px,
         max_abs_scene_shift_px=args.max_scene_shift_px,
         invert_scene_shift=args.invert_scene_shift,
+        zoom=args.zoom,
+        zoom_step=args.zoom_step,
     )
     comfort_state.clamp()
 
@@ -1158,6 +1199,7 @@ def main() -> int:
                         fps = frames / (now - last)
                         print(
                             f"[INFO] FPS: {fps:.1f} "
+                            f"ZOOM={comfort_state.zoom:.2f} "
                             f"SCENE_FARTHER={comfort_state.scene_farther_px:+.1f}px "
                             f"MONO={'on' if comfort_state.mono_to_both_eyes else 'off'} "
                             f"SWAP={'on' if comfort_state.swap_eyes else 'off'}"
@@ -1197,6 +1239,8 @@ def main() -> int:
             scene_shift_step_px=comfort_state.scene_shift_step_px,
             max_abs_scene_shift_px=comfort_state.max_abs_scene_shift_px,
             invert_scene_shift=comfort_state.invert_scene_shift,
+            zoom=comfort_state.zoom,
+            zoom_step=comfort_state.zoom_step,
             clear_r=renderer.clear_r if renderer else 0.02,
             clear_g=renderer.clear_g if renderer else 0.02,
             clear_b=renderer.clear_b if renderer else 0.02,

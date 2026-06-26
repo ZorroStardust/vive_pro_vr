@@ -29,3 +29,4 @@ xr-pink-world = { cmd = "bash scripts/run_xr_pink_world.sh", cwd = "mujoco_vive_
 xr-mujoco-opengl = { cmd = "bash scripts/run_xr_mujoco_opengl.sh", cwd = "mujoco_vive_scripts" }
 xr-crosshair = { cmd = "bash scripts/run_xr_crosshair.sh", cwd = "mujoco_vive_scripts" }
 xr-comfort = { cmd = "bash scripts/run_xr_comfort.sh", cwd = "mujoco_vive_scripts" }
+xr-surgical = { cmd = "bash scripts/run_xr_surgical.sh", cwd = "mujoco_vive_scripts" }

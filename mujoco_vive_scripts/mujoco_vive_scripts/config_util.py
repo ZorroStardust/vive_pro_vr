@@ -22,6 +22,8 @@ class ComfortConfig:
     scene_shift_step_px: float = 2.0
     max_abs_scene_shift_px: float = 80.0
     invert_scene_shift: bool = False
+    zoom: float = 1.0
+    zoom_step: float = 0.1
     clear_r: float = 0.02
     clear_g: float = 0.02
     clear_b: float = 0.02
@@ -65,6 +67,8 @@ def load_comfort(path: str | Path | None = None) -> ComfortConfig | None:
         scene_shift_step_px=c.get("scene_shift_step_px", 2.0),
         max_abs_scene_shift_px=c.get("max_abs_scene_shift_px", 80.0),
         invert_scene_shift=c.get("invert_scene_shift", False),
+        zoom=c.get("zoom", 1.0),
+        zoom_step=c.get("zoom_step", 0.1),
         clear_r=c.get("clear_r", 0.02),
         clear_g=c.get("clear_g", 0.02),
         clear_b=c.get("clear_b", 0.02),
@@ -108,6 +112,8 @@ def save_calibration(
             ("scene_shift_step_px", comfort.scene_shift_step_px),
             ("max_abs_scene_shift_px", comfort.max_abs_scene_shift_px),
             ("invert_scene_shift", comfort.invert_scene_shift),
+            ("zoom", comfort.zoom),
+            ("zoom_step", comfort.zoom_step),
             ("clear_r", comfort.clear_r),
             ("clear_g", comfort.clear_g),
             ("clear_b", comfort.clear_b),
@@ -141,6 +147,8 @@ def save_comfort(
         ("scene_shift_step_px", c.scene_shift_step_px),
         ("max_abs_scene_shift_px", c.max_abs_scene_shift_px),
         ("invert_scene_shift", c.invert_scene_shift),
+        ("zoom", c.zoom),
+        ("zoom_step", c.zoom_step),
         ("clear_r", c.clear_r),
         ("clear_g", c.clear_g),
         ("clear_b", c.clear_b),
@@ -171,6 +179,8 @@ def save_full_config(
             ("scene_shift_step_px", comfort.scene_shift_step_px),
             ("max_abs_scene_shift_px", comfort.max_abs_scene_shift_px),
             ("invert_scene_shift", comfort.invert_scene_shift),
+            ("zoom", comfort.zoom),
+            ("zoom_step", comfort.zoom_step),
             ("clear_r", comfort.clear_r),
             ("clear_g", comfort.clear_g),
             ("clear_b", comfort.clear_b),

@@ -10,6 +10,7 @@ mujoco_vive_scripts/xr_crosshair_calibration.py
 mujoco_vive_scripts/xr_mujoco_opengl.py
 mujoco_vive_scripts/xr_mujoco_opengl_comfort.py
 mujoco_vive_scripts/xr_pink_world_check.py
+mujoco_vive_scripts/xr_surgical_robot.py
 mujoco_vive_scripts.egg-info/PKG-INFO
 mujoco_vive_scripts.egg-info/SOURCES.txt
 mujoco_vive_scripts.egg-info/dependency_links.txt
