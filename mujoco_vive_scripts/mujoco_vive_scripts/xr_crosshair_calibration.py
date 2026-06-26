@@ -27,6 +27,7 @@ Crosshair Calibration Controls
  y / u    shift left-eye  crosshair ↓ ↑
  n / m    shift right-eye crosshair ↓ ↑
  r        reset all offsets to zero
+ s        save current offsets to calibration.toml
  q / esc  quit (dumps current calibration)
 """
 
@@ -199,6 +200,18 @@ def _handle_input(reader: _StdinReader, renderer: CrosshairRenderer) -> bool:
         renderer.offset_right_x = 0
         renderer.offset_right_y = 0
         changed = True
+    elif ch == "s":
+        from .config_util import Calibration, save_calibration, _default_config_path
+
+        cal = Calibration(
+            left_x=renderer.offset_left_x,
+            left_y=renderer.offset_left_y,
+            right_x=renderer.offset_right_x,
+            right_y=renderer.offset_right_y,
+        )
+        cfg_path = _default_config_path()
+        save_calibration(cal)
+        print(f"\r[SAVED] {cfg_path}", flush=True)
 
     if changed:
         print(
@@ -212,6 +225,10 @@ def _handle_input(reader: _StdinReader, renderer: CrosshairRenderer) -> bool:
 
 
 def parse_args():
+    from .config_util import load_calibration
+
+    calib = load_calibration()
+
     parser = argparse.ArgumentParser(
         description="OpenXR crosshair calibration tool — same crosshair to both eyes."
     )
@@ -224,26 +241,37 @@ def parse_args():
     parser.add_argument(
         "--offset-left-x",
         type=int,
-        default=0,
+        default=calib.left_x if calib else 0,
         help="Initial left-eye horizontal offset in pixels.",
     )
     parser.add_argument(
         "--offset-left-y",
         type=int,
-        default=0,
+        default=calib.left_y if calib else 0,
         help="Initial left-eye vertical offset in pixels.",
     )
     parser.add_argument(
         "--offset-right-x",
         type=int,
-        default=0,
+        default=calib.right_x if calib else 0,
         help="Initial right-eye horizontal offset in pixels.",
     )
     parser.add_argument(
         "--offset-right-y",
         type=int,
-        default=0,
+        default=calib.right_y if calib else 0,
         help="Initial right-eye vertical offset in pixels.",
+    )
+    parser.add_argument(
+        "--save",
+        action="store_true",
+        help="Save calibration to config file on exit.",
+    )
+    parser.add_argument(
+        "--save-on-quit",
+        dest="save",
+        action="store_true",
+        help=argparse.SUPPRESS,
     )
     return parser.parse_args()
 
@@ -269,6 +297,15 @@ def main() -> int:
     print("[INFO] Crosshair Calibration — OpenXR")
     print("[INFO] Both eyes receive the same crosshair pattern.")
     print("[INFO] Use keyboard to align left/right crosshairs.")
+
+    if any((args.offset_left_x, args.offset_left_y, args.offset_right_x, args.offset_right_y)):
+        from .config_util import _default_config_path
+        src = _default_config_path()
+        label = "config" if src.exists() else "CLI"
+        print(f"[INFO] Loaded calibration ({label}): "
+              f"L=({args.offset_left_x:+d}, {args.offset_left_y:+d})  "
+              f"R=({args.offset_right_x:+d}, {args.offset_right_y:+d})")
+
     print(HINT)
 
     provider = _NvidiaEGLContextProvider()
@@ -326,6 +363,19 @@ def main() -> int:
         print("\n[RESULT] Calibration offsets:")
         print(f"  Left  eye: dx={renderer.offset_left_x:+d}, dy={renderer.offset_left_y:+d}")
         print(f"  Right eye: dx={renderer.offset_right_x:+d}, dy={renderer.offset_right_y:+d}")
+
+        if args.save:
+            from .config_util import Calibration, save_calibration, _default_config_path
+
+            cal = Calibration(
+                left_x=renderer.offset_left_x,
+                left_y=renderer.offset_left_y,
+                right_x=renderer.offset_right_x,
+                right_y=renderer.offset_right_y,
+            )
+            cfg_path = _default_config_path()
+            save_calibration(cal)
+            print(f"[INFO] Saved calibration to {cfg_path}")
 
     return 0
 

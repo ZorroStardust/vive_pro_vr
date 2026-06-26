@@ -5,7 +5,7 @@ import ctypes
 import math
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 # Must be set before importing PyOpenGL.
@@ -587,11 +587,6 @@ class MujocoStereoRenderer:
     calib_left_y: int = 0
     calib_right_x: int = 0
     calib_right_y: int = 0
-    _fbo: int = field(default=0, repr=False)
-    _fbo_color_tex: int = field(default=0, repr=False)
-    _fbo_depth_rb: int = field(default=0, repr=False)
-    _fbo_w: int = field(default=0, repr=False)
-    _fbo_h: int = field(default=0, repr=False)
 
     @classmethod
     def create(
@@ -669,73 +664,16 @@ class MujocoStereoRenderer:
         else:
             mujoco.mj_step(self.model, self.data)
 
-    def _ensure_fbo(self, w: int, h: int) -> None:
-        from OpenGL import GL
-
-        if self._fbo and self._fbo_w == w and self._fbo_h == h:
-            return
-
-        self._destroy_fbo()
-        GL.glGetError()
-
-        self._fbo = GL.glGenFramebuffers(1)
-        self._fbo_color_tex = GL.glGenTextures(1)
-        self._fbo_depth_rb = GL.glGenRenderbuffers(1)
-
-        GL.glBindTexture(GL.GL_TEXTURE_2D, self._fbo_color_tex)
-        GL.glTexImage2D(
-            GL.GL_TEXTURE_2D, 0, GL.GL_RGBA8,
-            w, h, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, None,
-        )
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_NEAREST)
-        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_NEAREST)
-
-        GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, self._fbo_depth_rb)
-        GL.glRenderbufferStorage(GL.GL_RENDERBUFFER, GL.GL_DEPTH_COMPONENT24, w, h)
-
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self._fbo)
-        GL.glFramebufferTexture2D(
-            GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0,
-            GL.GL_TEXTURE_2D, self._fbo_color_tex, 0,
-        )
-        GL.glFramebufferRenderbuffer(
-            GL.GL_FRAMEBUFFER, GL.GL_DEPTH_ATTACHMENT,
-            GL.GL_RENDERBUFFER, self._fbo_depth_rb,
-        )
-
-        status = GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER)
-        if status != GL.GL_FRAMEBUFFER_COMPLETE:
-            raise RuntimeError(f"FBO incomplete: 0x{status:x}")
-
-        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
-        self._fbo_w = w
-        self._fbo_h = h
-
-    def _destroy_fbo(self) -> None:
-        from OpenGL import GL
-
-        if self._fbo_color_tex:
-            GL.glDeleteTextures(1, [self._fbo_color_tex])
-            self._fbo_color_tex = 0
-        if self._fbo_depth_rb:
-            GL.glDeleteRenderbuffers(1, [self._fbo_depth_rb])
-            self._fbo_depth_rb = 0
-        if self._fbo:
-            GL.glDeleteFramebuffers(1, [self._fbo])
-            self._fbo = 0
-        self._fbo_w = 0
-        self._fbo_h = 0
-
     def render_eye(self, view_index: int, swap_eyes: bool) -> None:
         from OpenGL import GL
 
-        # if view_index == 0:
-        #     cam_id = self.right_id if swap_eyes else self.left_id
-        # else:
-        #     cam_id = self.left_id if swap_eyes else self.right_id
+        if view_index == 0:
+            cam_id = self.right_id if swap_eyes else self.left_id
+        else:
+            cam_id = self.left_id if swap_eyes else self.right_id
 
         # Mono-to-both-eyes mode: easiest to fuse.
-        cam_id = self.left_id
+        # cam_id = self.left_id
 
         self.camera.type = mujoco.mjtCamera.mjCAMERA_FIXED
         self.camera.fixedcamid = cam_id
@@ -765,57 +703,31 @@ class MujocoStereoRenderer:
 
         _drain_gl_errors(f"before render_eye {view_index}")
 
-        if calib_x == 0 and calib_y == 0:
-            rect = mujoco.MjrRect(vp_x, vp_y, vp_w, vp_h)
-            GL.glEnable(GL.GL_DEPTH_TEST)
-            GL.glClearColor(0.02, 0.02, 0.02, 1.0)
-            GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
-            mujoco.mjr_render(rect, self.scene, self.context)
-        else:
-            self._ensure_fbo(vp_w, vp_h)
+        GL.glEnable(GL.GL_DEPTH_TEST)
+        GL.glClearColor(0.02, 0.02, 0.02, 1.0)
+        GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
-            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, self._fbo)
-            GL.glViewport(0, 0, vp_w, vp_h)
+        rect = mujoco.MjrRect(
+            vp_x + calib_x,
+            vp_y + calib_y,
+            vp_w,
+            vp_h,
+        )
 
-            rect = mujoco.MjrRect(0, 0, vp_w, vp_h)
-            GL.glEnable(GL.GL_DEPTH_TEST)
-            GL.glClearColor(0.02, 0.02, 0.02, 1.0)
-            GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
-            mujoco.mjr_render(rect, self.scene, self.context)
-
-            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
-            GL.glViewport(vp_x, vp_y, vp_w, vp_h)
-
-            GL.glClearColor(0.02, 0.02, 0.02, 1.0)
-            GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
-
-            GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, self._fbo)
-            GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, 0)
-
-            src_x0 = max(0, -calib_x)
-            src_y0 = max(0, -calib_y)
-            dst_x0 = max(0, calib_x)
-            dst_y0 = max(0, calib_y)
-            blit_w = vp_w - abs(calib_x)
-            blit_h = vp_h - abs(calib_y)
-
-            GL.glBlitFramebuffer(
-                src_x0, src_y0, src_x0 + blit_w, src_y0 + blit_h,
-                dst_x0, dst_y0, dst_x0 + blit_w, dst_y0 + blit_h,
-                GL.GL_COLOR_BUFFER_BIT, GL.GL_NEAREST,
-            )
-
-            GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, 0)
+        mujoco.mjr_render(rect, self.scene, self.context)
 
         _drain_gl_errors(f"after mujoco.mjr_render eye {view_index}", print_limit=2)
 
 
     def close(self):
-        self._destroy_fbo()
         self.context.free()
 
 
 def parse_args():
+    from .config_util import load_calibration
+
+    calib = load_calibration()
+
     parser = argparse.ArgumentParser(
         description="Render MuJoCo stereo cameras to OpenXR OpenGL swapchain via headless EGL."
     )
@@ -833,14 +745,26 @@ def parse_args():
     parser.add_argument("--no-animate", action="store_true")
     parser.add_argument("--clear-only", action="store_true")
     parser.add_argument("--print-every", type=float, default=2.0)
-    parser.add_argument("--calib-left-x", type=int, default=0,
-                        help="Left-eye horizontal calibration offset in pixels.")
-    parser.add_argument("--calib-left-y", type=int, default=0,
-                        help="Left-eye vertical calibration offset in pixels.")
-    parser.add_argument("--calib-right-x", type=int, default=0,
-                        help="Right-eye horizontal calibration offset in pixels.")
-    parser.add_argument("--calib-right-y", type=int, default=0,
-                        help="Right-eye vertical calibration offset in pixels.")
+    parser.add_argument(
+        "--calib-left-x", type=int,
+        default=calib.left_x if calib else 0,
+        help="Left-eye horizontal calibration offset in pixels.",
+    )
+    parser.add_argument(
+        "--calib-left-y", type=int,
+        default=calib.left_y if calib else 0,
+        help="Left-eye vertical calibration offset in pixels.",
+    )
+    parser.add_argument(
+        "--calib-right-x", type=int,
+        default=calib.right_x if calib else 0,
+        help="Right-eye horizontal calibration offset in pixels.",
+    )
+    parser.add_argument(
+        "--calib-right-y", type=int,
+        default=calib.right_y if calib else 0,
+        help="Right-eye vertical calibration offset in pixels.",
+    )
     return parser.parse_args()
 
 
@@ -876,7 +800,10 @@ def main() -> int:
     print("[INFO] Starting MuJoCo -> pyopenxr OpenGL (headless EGL).")
     print("[INFO] HMD pose is ignored; MuJoCo endoscope cameras define the views.")
     if any((args.calib_left_x, args.calib_left_y, args.calib_right_x, args.calib_right_y)):
-        print(f"[INFO] Calibration offsets: L=({args.calib_left_x:+d}, {args.calib_left_y:+d})  "
+        from .config_util import _default_config_path
+        cfg_path = _default_config_path()
+        src = f"from {cfg_path}" if cfg_path.exists() else "from CLI"
+        print(f"[INFO] Calibration ({src}): L=({args.calib_left_x:+d}, {args.calib_left_y:+d})  "
               f"R=({args.calib_right_x:+d}, {args.calib_right_y:+d})")
 
     # Important: create EGL context before touching pyopenxr ContextObject.
