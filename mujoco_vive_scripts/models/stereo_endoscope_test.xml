@@ -43,12 +43,12 @@
       <geom name="tip_marker" type="sphere" size="0.025" rgba="1 1 1 1"/>
 
       <camera name="endo_left"
-              pos="-0.003 0 0"
+              pos="-0.002 0 0"
               xyaxes="1 0 0  0 0 1"
               fovy="85"/>
 
       <camera name="endo_right"
-              pos="0.003 0 0"
+              pos="0.002 0 0"
               xyaxes="1 0 0  0 0 1"
               fovy="85"/>
     </body>

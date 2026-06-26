@@ -731,7 +731,11 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Render MuJoCo stereo cameras to OpenXR OpenGL swapchain via headless EGL."
     )
-    parser.add_argument("--model", required=True)
+    parser.add_argument(
+        "--model",
+        default=str(Path(__file__).resolve().parent.parent / "models" / "stereo_endoscope_test.xml"),
+        help="Path to MuJoCo XML model.",
+    )
     parser.add_argument("--left-camera", default="endo_left")
     parser.add_argument("--right-camera", default="endo_right")
     parser.add_argument("--max-geom", type=int, default=10000)
@@ -799,12 +803,11 @@ def main() -> int:
 
     print("[INFO] Starting MuJoCo -> pyopenxr OpenGL (headless EGL).")
     print("[INFO] HMD pose is ignored; MuJoCo endoscope cameras define the views.")
-    if any((args.calib_left_x, args.calib_left_y, args.calib_right_x, args.calib_right_y)):
-        from .config_util import _default_config_path
-        cfg_path = _default_config_path()
-        src = f"from {cfg_path}" if cfg_path.exists() else "from CLI"
-        print(f"[INFO] Calibration ({src}): L=({args.calib_left_x:+d}, {args.calib_left_y:+d})  "
-              f"R=({args.calib_right_x:+d}, {args.calib_right_y:+d})")
+    from .config_util import _default_config_path
+    cfg_path = _default_config_path()
+    src = f"from {cfg_path}" if cfg_path.exists() else "defaults"
+    print(f"[INFO] Calibration ({src}): L=({args.calib_left_x:+d}, {args.calib_left_y:+d})  "
+          f"R=({args.calib_right_x:+d}, {args.calib_right_y:+d})")
 
     # Important: create EGL context before touching pyopenxr ContextObject.
     provider = _NvidiaEGLContextProvider()

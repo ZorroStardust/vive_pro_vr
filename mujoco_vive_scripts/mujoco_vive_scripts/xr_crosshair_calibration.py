@@ -7,28 +7,35 @@ import select
 import sys
 import termios
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
 os.environ.setdefault("MUJOCO_GL", "egl")
 
 import xr
 
+
 _REQUIRED_EXTENSIONS = (
     "XR_KHR_opengl_enable",
     "XR_MNDX_egl_enable",
 )
 
+
 HINT = """
 Crosshair Calibration Controls
 ────────────────────────────────
- h / l    shift left-eye  crosshair ← →
- j / k    shift right-eye crosshair ← →
- y / u    shift left-eye  crosshair ↓ ↑
- n / m    shift right-eye crosshair ↓ ↑
- r        reset all offsets to zero
- s        save current offsets to calibration.toml
- q / esc  quit (dumps current calibration)
+h / l shift left-eye crosshair ← →
+j / k shift right-eye crosshair ← →
+
+y / u shift left-eye crosshair ↓ ↑
+n / m shift right-eye crosshair ↓ ↑
+
+a / d move crosshair farther / nearer
+e     reset stereo depth to zero
+
+r     reset all offsets and depth to zero
+s     save current offsets to calibration.toml
+q / esc quit (dumps current calibration)
 """
 
 
@@ -45,28 +52,82 @@ class CrosshairRenderer:
     offset_right_x: int = 0
     offset_right_y: int = 0
 
-    def _viewport_w_h(self):
+    # Stereo depth control.
+    #
+    # depth_disparity_px > 0:
+    #   left-eye crosshair moves right,
+    #   right-eye crosshair moves left,
+    #   usually perceived as nearer.
+    #
+    # depth_disparity_px < 0:
+    #   left-eye crosshair moves left,
+    #   right-eye crosshair moves right,
+    #   usually perceived as farther.
+    depth_disparity_px: float = 0.0
+
+    depth_step_px: float = 1.0
+    max_depth_disparity_px: float = 80.0
+    invert_depth_sign: bool = False
+
+    def _viewport_w_h(self) -> tuple[int, int]:
         from OpenGL import GL
 
         vp = GL.glGetIntegerv(GL.GL_VIEWPORT)
         return int(vp[2]), int(vp[3])
 
-    def _normalized_offset(self, px: int, ref: int) -> float:
+    def _normalized_offset(self, px: float, ref: int) -> float:
         if ref <= 0:
             return 0.0
-        return (px / (ref * 0.5)) * 2.0
 
-    def render(self, view_index: int):
+        # glOrtho(-1, 1, -1, 1, -1, 1)
+        # Total NDC width/height is 2.
+        # 1 px = 2 / viewport_size.
+        return px / (ref * 0.5)
+
+    def clamp_depth(self) -> None:
+        self.depth_disparity_px = max(
+            -self.max_depth_disparity_px,
+            min(self.max_depth_disparity_px, self.depth_disparity_px),
+        )
+
+    def reset_all(self) -> None:
+        self.offset_left_x = 0
+        self.offset_left_y = 0
+        self.offset_right_x = 0
+        self.offset_right_y = 0
+        self.depth_disparity_px = 0.0
+
+    def reset_depth(self) -> None:
+        self.depth_disparity_px = 0.0
+
+    def move_depth_nearer(self) -> None:
+        self.depth_disparity_px += self.depth_step_px
+        self.clamp_depth()
+
+    def move_depth_farther(self) -> None:
+        self.depth_disparity_px -= self.depth_step_px
+        self.clamp_depth()
+
+    def _effective_offsets_px(self, view_index: int) -> tuple[float, float]:
+        sign = -1.0 if self.invert_depth_sign else 1.0
+        half_depth = 0.5 * self.depth_disparity_px * sign
+
+        if view_index == 0:
+            # Left eye.
+            return self.offset_left_x + half_depth, self.offset_left_y
+
+        # Right eye.
+        return self.offset_right_x - half_depth, self.offset_right_y
+
+    def render(self, view_index: int) -> None:
         from OpenGL import GL
 
         w, h = self._viewport_w_h()
 
-        if view_index == 0:
-            ox = self._normalized_offset(self.offset_left_x, w)
-            oy = self._normalized_offset(self.offset_left_y, h)
-        else:
-            ox = self._normalized_offset(self.offset_right_x, w)
-            oy = self._normalized_offset(self.offset_right_y, h)
+        px_x, px_y = self._effective_offsets_px(view_index)
+
+        ox = self._normalized_offset(px_x, w)
+        oy = self._normalized_offset(px_y, h)
 
         GL.glClearColor(0.0, 0.0, 0.0, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
@@ -77,14 +138,17 @@ class CrosshairRenderer:
         GL.glPushMatrix()
         GL.glLoadIdentity()
         GL.glOrtho(-1, 1, -1, 1, -1, 1)
+
         GL.glMatrixMode(GL.GL_MODELVIEW)
         GL.glPushMatrix()
         GL.glLoadIdentity()
 
+        # Main white crosshair.
         GL.glColor3f(1.0, 1.0, 1.0)
         GL.glLineWidth(2.0)
 
         half = 0.04
+
         GL.glBegin(GL.GL_LINES)
         GL.glVertex2f(-half + ox, oy)
         GL.glVertex2f(half + ox, oy)
@@ -93,6 +157,8 @@ class CrosshairRenderer:
         GL.glEnd()
 
         GL.glLineWidth(1.0)
+
+        # Corner/edge reference ticks.
         GL.glColor3f(0.3, 0.3, 0.3)
 
         gap = 0.015
@@ -113,20 +179,28 @@ class CrosshairRenderer:
                 GL.glVertex2f(tx, ty + seg)
                 GL.glEnd()
 
+        # Dim center axes.
         GL.glColor3f(0.15, 0.15, 0.15)
+
         GL.glBegin(GL.GL_LINES)
+
         GL.glVertex2f(-1, 0)
         GL.glVertex2f(-gap, 0)
+
         GL.glVertex2f(gap, 0)
         GL.glVertex2f(1, 0)
+
         GL.glVertex2f(0, -1)
         GL.glVertex2f(0, -gap)
+
         GL.glVertex2f(0, gap)
         GL.glVertex2f(0, 1)
+
         GL.glEnd()
 
         GL.glMatrixMode(GL.GL_PROJECTION)
         GL.glPopMatrix()
+
         GL.glMatrixMode(GL.GL_MODELVIEW)
         GL.glPopMatrix()
 
@@ -138,8 +212,10 @@ class _StdinReader:
         self._fd = sys.stdin.fileno()
         self._old = termios.tcgetattr(self._fd)
         self._old_flags = fcntl.fcntl(self._fd, fcntl.F_GETFL)
+
         new = termios.tcgetattr(self._fd)
         new[3] = new[3] & ~(termios.ECHO | termios.ICANON)
+
         termios.tcsetattr(self._fd, termios.TCSANOW, new)
         fcntl.fcntl(self._fd, fcntl.F_SETFL, self._old_flags | os.O_NONBLOCK)
 
@@ -154,52 +230,84 @@ class _StdinReader:
                 return data.decode(errors="replace")
             except (OSError, BlockingIOError):
                 pass
+
         return None
+
+
+def _print_state(prefix: str, renderer: CrosshairRenderer, end: str = "\n") -> None:
+    print(
+        f"{prefix} "
+        f"L=({renderer.offset_left_x:+d}, {renderer.offset_left_y:+d}) "
+        f"R=({renderer.offset_right_x:+d}, {renderer.offset_right_y:+d}) "
+        f"DEPTH={renderer.depth_disparity_px:+.1f}px",
+        end=end,
+        flush=True,
+    )
 
 
 def _handle_input(reader: _StdinReader, renderer: CrosshairRenderer) -> bool:
     key = reader.read_key()
+
     if key is None:
         return True
 
     ch = key[-1] if key else ""
-
     changed = False
+
     if ch in ("\x1b", "q"):
         print("\n[INFO] Quit requested.")
         return False
 
     step = 1
+
     if ch == "h":
         renderer.offset_left_x -= step
         changed = True
+
     elif ch == "l":
         renderer.offset_left_x += step
         changed = True
+
     elif ch == "j":
         renderer.offset_right_x -= step
         changed = True
+
     elif ch == "k":
         renderer.offset_right_x += step
         changed = True
+
     elif ch == "y":
         renderer.offset_left_y += step
         changed = True
+
     elif ch == "u":
         renderer.offset_left_y -= step
         changed = True
+
     elif ch == "n":
         renderer.offset_right_y += step
         changed = True
+
     elif ch == "m":
         renderer.offset_right_y -= step
         changed = True
-    elif ch == "r":
-        renderer.offset_left_x = 0
-        renderer.offset_left_y = 0
-        renderer.offset_right_x = 0
-        renderer.offset_right_y = 0
+
+    elif ch == "a":
+        renderer.move_depth_farther()
         changed = True
+
+    elif ch == "d":
+        renderer.move_depth_nearer()
+        changed = True
+
+    elif ch == "e":
+        renderer.reset_depth()
+        changed = True
+
+    elif ch == "r":
+        renderer.reset_all()
+        changed = True
+
     elif ch == "s":
         from .config_util import Calibration, save_calibration, _default_config_path
 
@@ -209,17 +317,14 @@ def _handle_input(reader: _StdinReader, renderer: CrosshairRenderer) -> bool:
             right_x=renderer.offset_right_x,
             right_y=renderer.offset_right_y,
         )
+
         cfg_path = _default_config_path()
         save_calibration(cal)
-        print(f"\r[SAVED] {cfg_path}", flush=True)
+
+        print(f"\r[SAVED] {cfg_path} offsets only", flush=True)
 
     if changed:
-        print(
-            f"\r[OFFSETS] L=({renderer.offset_left_x:+d}, {renderer.offset_left_y:+d})  "
-            f"R=({renderer.offset_right_x:+d}, {renderer.offset_right_y:+d})",
-            end="",
-            flush=True,
-        )
+        _print_state("\r[OFFSETS]", renderer, end="")
 
     return True
 
@@ -230,49 +335,84 @@ def parse_args():
     calib = load_calibration()
 
     parser = argparse.ArgumentParser(
-        description="OpenXR crosshair calibration tool — same crosshair to both eyes."
+        description="OpenXR crosshair calibration tool with adjustable stereo depth."
     )
+
     parser.add_argument(
         "--print-every",
         type=float,
         default=2.0,
         help="FPS print interval in seconds.",
     )
+
     parser.add_argument(
         "--offset-left-x",
         type=int,
         default=calib.left_x if calib else 0,
         help="Initial left-eye horizontal offset in pixels.",
     )
+
     parser.add_argument(
         "--offset-left-y",
         type=int,
         default=calib.left_y if calib else 0,
         help="Initial left-eye vertical offset in pixels.",
     )
+
     parser.add_argument(
         "--offset-right-x",
         type=int,
         default=calib.right_x if calib else 0,
         help="Initial right-eye horizontal offset in pixels.",
     )
+
     parser.add_argument(
         "--offset-right-y",
         type=int,
         default=calib.right_y if calib else 0,
         help="Initial right-eye vertical offset in pixels.",
     )
+
+    parser.add_argument(
+        "--depth-px",
+        type=float,
+        default=0.0,
+        help="Initial stereo depth disparity in pixels. Positive usually means nearer.",
+    )
+
+    parser.add_argument(
+        "--depth-step-px",
+        type=float,
+        default=1.0,
+        help="Stereo depth adjustment step in pixels.",
+    )
+
+    parser.add_argument(
+        "--max-depth-px",
+        type=float,
+        default=80.0,
+        help="Maximum absolute stereo depth disparity in pixels.",
+    )
+
+    parser.add_argument(
+        "--invert-depth-sign",
+        action="store_true",
+        help="Invert stereo depth sign if near/far direction feels reversed.",
+    )
+
     parser.add_argument(
         "--save",
         action="store_true",
-        help="Save calibration to config file on exit.",
+        help="Save calibration offsets to config file on exit.",
     )
+
     parser.add_argument(
         "--save-on-quit",
         dest="save",
         action="store_true",
         help=argparse.SUPPRESS,
     )
+
     return parser.parse_args()
 
 
@@ -281,12 +421,15 @@ def check_openxr():
         _extension_name_to_str(ext.extension_name)
         for ext in xr.enumerate_instance_extension_properties()
     }
+
     for ext in _REQUIRED_EXTENSIONS:
         if ext not in names:
             raise RuntimeError(f"{ext} is not available")
+
     print("[INFO] Required OpenXR extensions available:")
+
     for ext in _REQUIRED_EXTENSIONS:
-        print(f"       {ext}")
+        print(f"  {ext}")
 
 
 def main() -> int:
@@ -295,20 +438,32 @@ def main() -> int:
     from .xr_mujoco_opengl import _NvidiaEGLContextProvider
 
     print("[INFO] Crosshair Calibration — OpenXR")
-    print("[INFO] Both eyes receive the same crosshair pattern.")
-    print("[INFO] Use keyboard to align left/right crosshairs.")
+    print("[INFO] Both eyes receive a 2D crosshair pattern.")
+    print("[INFO] Calibration offsets and stereo depth are controlled separately.")
 
-    if any((args.offset_left_x, args.offset_left_y, args.offset_right_x, args.offset_right_y)):
+    if any(
+        (
+            args.offset_left_x,
+            args.offset_left_y,
+            args.offset_right_x,
+            args.offset_right_y,
+        )
+    ):
         from .config_util import _default_config_path
+
         src = _default_config_path()
         label = "config" if src.exists() else "CLI"
-        print(f"[INFO] Loaded calibration ({label}): "
-              f"L=({args.offset_left_x:+d}, {args.offset_left_y:+d})  "
-              f"R=({args.offset_right_x:+d}, {args.offset_right_y:+d})")
+
+        print(
+            f"[INFO] Loaded calibration ({label}): "
+            f"L=({args.offset_left_x:+d}, {args.offset_left_y:+d}) "
+            f"R=({args.offset_right_x:+d}, {args.offset_right_y:+d})"
+        )
 
     print(HINT)
 
     provider = _NvidiaEGLContextProvider()
+
     check_openxr()
 
     from xr.utils.gl import ContextObject
@@ -318,9 +473,16 @@ def main() -> int:
         offset_left_y=args.offset_left_y,
         offset_right_x=args.offset_right_x,
         offset_right_y=args.offset_right_y,
+        depth_disparity_px=args.depth_px,
+        depth_step_px=args.depth_step_px,
+        max_depth_disparity_px=args.max_depth_px,
+        invert_depth_sign=args.invert_depth_sign,
     )
 
+    renderer.clamp_depth()
+
     stdin_reader = _StdinReader()
+
     start = time.perf_counter()
     last = start
     frames = 0
@@ -333,9 +495,9 @@ def main() -> int:
                 enabled_extension_names=list(_REQUIRED_EXTENSIONS),
             ),
         ) as xr_context:
-            print("[INFO] Session started. Adjust offsets until crosshairs fuse.")
-            print(f"[OFFSETS] L=({renderer.offset_left_x:+d}, {renderer.offset_left_y:+d})  "
-                  f"R=({renderer.offset_right_x:+d}, {renderer.offset_right_y:+d})")
+            print("[INFO] Session started.")
+            print("[INFO] First calibrate offsets at DEPTH=+0.0px, then adjust depth.")
+            _print_state("[OFFSETS]", renderer)
 
             for _frame_index, frame_state in enumerate(xr_context.frame_loop()):
                 if not running:
@@ -345,13 +507,19 @@ def main() -> int:
                     renderer.render(view_index)
 
                 frames += 1
+
                 now = time.perf_counter()
+
                 if now - last >= args.print_every:
+                    fps = frames / (now - last)
+
                     print(
-                        f"\r[INFO] FPS: {frames / (now - last):.1f}  "
-                        f"L=({renderer.offset_left_x:+d}, {renderer.offset_left_y:+d})  "
-                        f"R=({renderer.offset_right_x:+d}, {renderer.offset_right_y:+d})",
+                        f"\r[INFO] FPS: {fps:.1f} "
+                        f"L=({renderer.offset_left_x:+d}, {renderer.offset_left_y:+d}) "
+                        f"R=({renderer.offset_right_x:+d}, {renderer.offset_right_y:+d}) "
+                        f"DEPTH={renderer.depth_disparity_px:+.1f}px",
                     )
+
                     frames = 0
                     last = now
 
@@ -360,22 +528,26 @@ def main() -> int:
     finally:
         provider.destroy()
         stdin_reader.restore()
-        print("\n[RESULT] Calibration offsets:")
-        print(f"  Left  eye: dx={renderer.offset_left_x:+d}, dy={renderer.offset_left_y:+d}")
-        print(f"  Right eye: dx={renderer.offset_right_x:+d}, dy={renderer.offset_right_y:+d}")
 
-        if args.save:
-            from .config_util import Calibration, save_calibration, _default_config_path
+    print("\n[RESULT] Calibration offsets:")
+    print(f"  Left eye:  dx={renderer.offset_left_x:+d}, dy={renderer.offset_left_y:+d}")
+    print(f"  Right eye: dx={renderer.offset_right_x:+d}, dy={renderer.offset_right_y:+d}")
+    print(f"  Stereo depth disparity: {renderer.depth_disparity_px:+.1f}px")
 
-            cal = Calibration(
-                left_x=renderer.offset_left_x,
-                left_y=renderer.offset_left_y,
-                right_x=renderer.offset_right_x,
-                right_y=renderer.offset_right_y,
-            )
-            cfg_path = _default_config_path()
-            save_calibration(cal)
-            print(f"[INFO] Saved calibration to {cfg_path}")
+    if args.save:
+        from .config_util import Calibration, save_calibration, _default_config_path
+
+        cal = Calibration(
+            left_x=renderer.offset_left_x,
+            left_y=renderer.offset_left_y,
+            right_x=renderer.offset_right_x,
+            right_y=renderer.offset_right_y,
+        )
+
+        cfg_path = _default_config_path()
+        save_calibration(cal)
+
+        print(f"[INFO] Saved calibration offsets to {cfg_path}")
 
     return 0
 

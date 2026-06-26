@@ -1,5 +1,17 @@
 [calibration]
-left_x = 15
+left_x = 17
 left_y = 0
-right_x = -27
+right_x = -21
 right_y = 0
+
+[comfort]
+mono_to_both_eyes = false
+swap_eyes = false
+scene_farther_px = -80
+scene_shift_step_px = 2
+max_abs_scene_shift_px = 80
+invert_scene_shift = false
+clear_r = 0.02
+clear_g = 0.02
+clear_b = 0.02
+

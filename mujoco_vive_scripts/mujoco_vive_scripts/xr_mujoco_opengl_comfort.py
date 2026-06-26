@@ -4,6 +4,10 @@ import argparse
 import ctypes
 import math
 import os
+import select
+import sys
+import termios
+import fcntl
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,6 +29,26 @@ _REQUIRED_EXTENSIONS = (
     "XR_KHR_opengl_enable",
     "XR_MNDX_egl_enable",
 )
+
+
+HINT = """
+MuJoCo VR Comfort Controls
+────────────────────────────────
+ a / d   move whole stereo scene farther / nearer
+ e       reset scene comfort shift to zero
+
+ p       toggle mono-to-both-eyes diagnostic mode
+ o       toggle swap-eyes
+
+ s       save current settings to calibration.toml
+ q / esc quit
+
+Recommended workflow:
+ 1. Try p first. Mono-to-both-eyes should be easiest to fuse.
+ 2. If mono is comfortable but stereo is tiring, reduce stereo stress with a.
+ 3. If positive farther shift feels reversed, use --invert-scene-shift or toggle swap-eyes.
+ 4. Press s to save settings for next session.
+"""
 
 
 def _extension_name_to_str(name) -> str:
@@ -77,9 +101,10 @@ def _cast_xr_egl_handle(handle, field_name: str):
         return ctypes.cast(ctypes.c_void_p(addr), field_type)
 
 
-_GL_ERROR_PRINT_COUNTS = {}
+_GL_ERROR_PRINT_COUNTS: dict[tuple[str, tuple[int, ...]], int] = {}
 
-def _drain_gl_errors(label: str = "", print_limit: int = 2):
+
+def _drain_gl_errors(label: str = "", print_limit: int = 2) -> None:
     """Drain pending OpenGL errors.
 
     MuJoCo may leave a sticky GL error after C-side rendering. PyOpenGL checks
@@ -91,7 +116,7 @@ def _drain_gl_errors(label: str = "", print_limit: int = 2):
     """
     from OpenGL import GL
 
-    errors = []
+    errors: list[int] = []
     while True:
         err = GL.glGetError()
         if err == GL.GL_NO_ERROR:
@@ -109,7 +134,6 @@ def _drain_gl_errors(label: str = "", print_limit: int = 2):
         print(f"[WARN] Drained OpenGL errors after {label}: {[hex(e) for e in errors]}")
     elif count == print_limit:
         print(f"[WARN] Further identical OpenGL errors after {label} will be suppressed.")
-
 
 
 class _NvidiaEGLContextProvider:
@@ -358,7 +382,6 @@ class _NvidiaEGLContextProvider:
         except Exception as exc:
             print(f"[WARN] Could not query GL profile mask: {exc}")
 
-
     def _egl_error(self) -> int:
         try:
             return int(self._libegl.eglGetError())
@@ -525,7 +548,7 @@ class _NvidiaEGLContextProvider:
         print(f"[INFO] Using EGL display route: {label}")
         return True
 
-    def make_current(self):
+    def make_current(self) -> None:
         self._libegl.eglMakeCurrent(
             self._display,
             self._surface,
@@ -533,7 +556,7 @@ class _NvidiaEGLContextProvider:
             self._context,
         )
 
-    def done_current(self):
+    def done_current(self) -> None:
         self._libegl.eglMakeCurrent(
             self._display,
             ctypes.c_void_p(self.EGL_NO_SURFACE),
@@ -541,7 +564,7 @@ class _NvidiaEGLContextProvider:
             ctypes.c_void_p(self.EGL_NO_CONTEXT),
         )
 
-    def destroy(self):
+    def destroy(self) -> None:
         if self._display is None:
             return
 
@@ -571,6 +594,152 @@ class _NvidiaEGLContextProvider:
             self._context = None
 
 
+class _StdinReader:
+    """Non-blocking single-key reader.
+
+    If stdin is not a TTY, this becomes a no-op reader so the renderer can still
+    run in a non-interactive launcher.
+    """
+
+    def __init__(self):
+        self._enabled = False
+        self._fd: int | None = None
+        self._old = None
+        self._old_flags = None
+
+        try:
+            if not sys.stdin.isatty():
+                return
+
+            self._fd = sys.stdin.fileno()
+            self._old = termios.tcgetattr(self._fd)
+            self._old_flags = fcntl.fcntl(self._fd, fcntl.F_GETFL)
+
+            new = termios.tcgetattr(self._fd)
+            new[3] = new[3] & ~(termios.ECHO | termios.ICANON)
+
+            termios.tcsetattr(self._fd, termios.TCSANOW, new)
+            fcntl.fcntl(self._fd, fcntl.F_SETFL, self._old_flags | os.O_NONBLOCK)
+            self._enabled = True
+        except Exception as exc:
+            print(f"[WARN] Keyboard control disabled: {exc}")
+            self._enabled = False
+
+    def restore(self) -> None:
+        if not self._enabled or self._fd is None:
+            return
+
+        try:
+            if self._old is not None:
+                termios.tcsetattr(self._fd, termios.TCSANOW, self._old)
+            if self._old_flags is not None:
+                fcntl.fcntl(self._fd, fcntl.F_SETFL, self._old_flags)
+        except Exception:
+            pass
+
+    def read_key(self) -> str | None:
+        if not self._enabled or self._fd is None:
+            return None
+
+        if select.select([sys.stdin], [], [], 0)[0]:
+            try:
+                data = os.read(self._fd, 16)
+                return data.decode(errors="replace")
+            except (OSError, BlockingIOError):
+                pass
+
+        return None
+
+
+@dataclass
+class RuntimeComfortState:
+    swap_eyes: bool = False
+    mono_to_both_eyes: bool = False
+
+    # Positive scene_farther_px shifts left-eye image left and right-eye image right.
+    # This usually reduces crossed disparity and makes the scene feel farther.
+    scene_farther_px: float = 0.0
+    scene_shift_step_px: float = 2.0
+    max_abs_scene_shift_px: float = 80.0
+    invert_scene_shift: bool = False
+
+    def clamp(self) -> None:
+        self.scene_farther_px = max(
+            -self.max_abs_scene_shift_px,
+            min(self.max_abs_scene_shift_px, self.scene_farther_px),
+        )
+
+    def move_farther(self) -> None:
+        self.scene_farther_px += self.scene_shift_step_px
+        self.clamp()
+
+    def move_nearer(self) -> None:
+        self.scene_farther_px -= self.scene_shift_step_px
+        self.clamp()
+
+    def reset_shift(self) -> None:
+        self.scene_farther_px = 0.0
+
+
+def _print_comfort_state(prefix: str, state: RuntimeComfortState, end: str = "\n") -> None:
+    print(
+        f"{prefix} "
+        f"SCENE_FARTHER={state.scene_farther_px:+.1f}px "
+        f"MONO={'on' if state.mono_to_both_eyes else 'off'} "
+        f"SWAP={'on' if state.swap_eyes else 'off'}",
+        end=end,
+        flush=True,
+    )
+
+
+def _handle_input(reader: _StdinReader, state: RuntimeComfortState) -> bool:
+    key = reader.read_key()
+    if key is None:
+        return True
+
+    ch = key[-1] if key else ""
+    changed = False
+
+    if ch in ("\x1b", "q"):
+        print("\n[INFO] Quit requested.")
+        return False
+
+    if ch == "a":
+        state.move_farther()
+        changed = True
+    elif ch == "d":
+        state.move_nearer()
+        changed = True
+    elif ch == "e":
+        state.reset_shift()
+        changed = True
+    elif ch == "p":
+        state.mono_to_both_eyes = not state.mono_to_both_eyes
+        changed = True
+    elif ch == "o":
+        state.swap_eyes = not state.swap_eyes
+        changed = True
+    elif ch == "s":
+        from .config_util import Calibration, ComfortConfig, save_full_config, load_calibration, _default_config_path
+
+        cfg_path = _default_config_path()
+        cal = load_calibration(cfg_path) or Calibration()
+        comfort = ComfortConfig(
+            mono_to_both_eyes=state.mono_to_both_eyes,
+            swap_eyes=state.swap_eyes,
+            scene_farther_px=state.scene_farther_px,
+            scene_shift_step_px=state.scene_shift_step_px,
+            max_abs_scene_shift_px=state.max_abs_scene_shift_px,
+            invert_scene_shift=state.invert_scene_shift,
+        )
+        save_full_config(cal, comfort, cfg_path)
+        print(f"\r[SAVED] {cfg_path}", flush=True)
+
+    if changed:
+        _print_comfort_state("\r[COMFORT]", state, end="")
+
+    return True
+
 
 @dataclass
 class MujocoStereoRenderer:
@@ -588,6 +757,11 @@ class MujocoStereoRenderer:
     calib_right_x: int = 0
     calib_right_y: int = 0
 
+    # Rendering comfort parameters.
+    clear_r: float = 0.02
+    clear_g: float = 0.02
+    clear_b: float = 0.02
+
     @classmethod
     def create(
         cls,
@@ -599,6 +773,7 @@ class MujocoStereoRenderer:
         calib_left_y: int = 0,
         calib_right_x: int = 0,
         calib_right_y: int = 0,
+        clear_rgb: tuple[float, float, float] = (0.02, 0.02, 0.02),
     ):
         if not Path(model_path).exists():
             raise FileNotFoundError(model_path)
@@ -655,6 +830,9 @@ class MujocoStereoRenderer:
             calib_left_y=calib_left_y,
             calib_right_x=calib_right_x,
             calib_right_y=calib_right_y,
+            clear_r=clear_rgb[0],
+            clear_g=clear_rgb[1],
+            clear_b=clear_rgb[2],
         )
 
     def step(self, t: float, animate: bool) -> None:
@@ -664,16 +842,38 @@ class MujocoStereoRenderer:
         else:
             mujoco.mj_step(self.model, self.data)
 
-    def render_eye(self, view_index: int, swap_eyes: bool) -> None:
-        from OpenGL import GL
+    def _camera_for_eye(self, view_index: int, state: RuntimeComfortState) -> int:
+        if state.mono_to_both_eyes:
+            return self.left_id
 
         if view_index == 0:
-            cam_id = self.right_id if swap_eyes else self.left_id
-        else:
-            cam_id = self.left_id if swap_eyes else self.right_id
+            return self.right_id if state.swap_eyes else self.left_id
 
-        # Mono-to-both-eyes mode: easiest to fuse.
-        # cam_id = self.left_id
+        return self.left_id if state.swap_eyes else self.right_id
+
+    def _calib_for_eye(self, view_index: int) -> tuple[int, int]:
+        if view_index == 0:
+            return self.calib_left_x, self.calib_left_y
+
+        return self.calib_right_x, self.calib_right_y
+
+    def _comfort_shift_for_eye(self, view_index: int, state: RuntimeComfortState) -> float:
+        # Positive scene_farther_px:
+        #   left eye image shifts left,
+        #   right eye image shifts right,
+        #   usually perceived as farther / less crossed.
+        sign = -1.0 if state.invert_scene_shift else 1.0
+        half_farther = 0.5 * state.scene_farther_px * sign
+
+        if view_index == 0:
+            return -half_farther
+
+        return half_farther
+
+    def render_eye(self, view_index: int, state: RuntimeComfortState) -> None:
+        from OpenGL import GL
+
+        cam_id = self._camera_for_eye(view_index, state)
 
         self.camera.type = mujoco.mjtCamera.mjCAMERA_FIXED
         self.camera.fixedcamid = cam_id
@@ -694,22 +894,18 @@ class MujocoStereoRenderer:
         vp_w = int(viewport[2])
         vp_h = int(viewport[3])
 
-        if view_index == 0:
-            calib_x = self.calib_left_x
-            calib_y = self.calib_left_y
-        else:
-            calib_x = self.calib_right_x
-            calib_y = self.calib_right_y
+        calib_x, calib_y = self._calib_for_eye(view_index)
+        comfort_x = self._comfort_shift_for_eye(view_index, state)
 
         _drain_gl_errors(f"before render_eye {view_index}")
 
         GL.glEnable(GL.GL_DEPTH_TEST)
-        GL.glClearColor(0.02, 0.02, 0.02, 1.0)
+        GL.glClearColor(self.clear_r, self.clear_g, self.clear_b, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
         rect = mujoco.MjrRect(
-            vp_x + calib_x,
-            vp_y + calib_y,
+            int(round(vp_x + calib_x + comfort_x)),
+            int(round(vp_y + calib_y)),
             vp_w,
             vp_h,
         )
@@ -718,19 +914,20 @@ class MujocoStereoRenderer:
 
         _drain_gl_errors(f"after mujoco.mjr_render eye {view_index}", print_limit=2)
 
-
-    def close(self):
+    def close(self) -> None:
         self.context.free()
 
 
 def parse_args():
-    from .config_util import load_calibration
+    from .config_util import load_calibration, load_comfort
 
     calib = load_calibration()
+    comfort = load_comfort()
 
     parser = argparse.ArgumentParser(
-        description="Render MuJoCo stereo cameras to OpenXR OpenGL swapchain via headless EGL."
+        description="Render MuJoCo stereo cameras to OpenXR OpenGL swapchain via headless EGL, with comfort controls."
     )
+
     parser.add_argument(
         "--model",
         default=str(Path(__file__).resolve().parent.parent / "models" / "stereo_endoscope_test.xml"),
@@ -739,40 +936,100 @@ def parse_args():
     parser.add_argument("--left-camera", default="endo_left")
     parser.add_argument("--right-camera", default="endo_right")
     parser.add_argument("--max-geom", type=int, default=10000)
+
     parser.add_argument(
         "--max-frames",
         type=int,
         default=0,
         help="0 means run forever",
     )
-    parser.add_argument("--swap-eyes", action="store_true")
+    parser.add_argument(
+        "--swap-eyes", action="store_true",
+        default=comfort.swap_eyes if comfort else False,
+    )
     parser.add_argument("--no-animate", action="store_true")
     parser.add_argument("--clear-only", action="store_true")
     parser.add_argument("--print-every", type=float, default=2.0)
+
     parser.add_argument(
-        "--calib-left-x", type=int,
+        "--calib-left-x",
+        type=int,
         default=calib.left_x if calib else 0,
         help="Left-eye horizontal calibration offset in pixels.",
     )
     parser.add_argument(
-        "--calib-left-y", type=int,
+        "--calib-left-y",
+        type=int,
         default=calib.left_y if calib else 0,
         help="Left-eye vertical calibration offset in pixels.",
     )
     parser.add_argument(
-        "--calib-right-x", type=int,
+        "--calib-right-x",
+        type=int,
         default=calib.right_x if calib else 0,
         help="Right-eye horizontal calibration offset in pixels.",
     )
     parser.add_argument(
-        "--calib-right-y", type=int,
+        "--calib-right-y",
+        type=int,
         default=calib.right_y if calib else 0,
         help="Right-eye vertical calibration offset in pixels.",
     )
+
+    # Comfort / depth controls.
+    parser.add_argument(
+        "--mono-to-both-eyes",
+        action="store_true",
+        default=comfort.mono_to_both_eyes if comfort else False,
+        help="Render the left MuJoCo camera to both eyes. Easiest to fuse; useful for diagnosis.",
+    )
+    parser.add_argument(
+        "--scene-farther-px",
+        type=float,
+        default=comfort.scene_farther_px if comfort else 0.0,
+        help=(
+            "Shift stereo images outward. Positive usually makes the whole MuJoCo "
+            "scene feel farther and less crossed."
+        ),
+    )
+    parser.add_argument(
+        "--scene-shift-step-px",
+        type=float,
+        default=comfort.scene_shift_step_px if comfort else 2.0,
+        help="Runtime keyboard adjustment step for scene farther/nearer shift.",
+    )
+    parser.add_argument(
+        "--max-scene-shift-px",
+        type=float,
+        default=comfort.max_abs_scene_shift_px if comfort else 80.0,
+        help="Maximum absolute scene shift in pixels.",
+    )
+    parser.add_argument(
+        "--invert-scene-shift",
+        action="store_true",
+        default=comfort.invert_scene_shift if comfort else False,
+        help="Invert scene farther/nearer shift direction if it feels reversed.",
+    )
+
+    parser.add_argument(
+        "--clear-rgb",
+        type=float,
+        nargs=3,
+        metavar=("R", "G", "B"),
+        default=comfort.to_rgb_tuple() if comfort else (0.02, 0.02, 0.02),
+        help="Background clear color, each value 0..1. Lower contrast often feels easier.",
+    )
+
+    parser.add_argument(
+        "--save",
+        action="store_true",
+        help="Save calibration and comfort settings to config file on exit.",
+    )
+
     return parser.parse_args()
 
 
-def check_openxr():
+def check_openxr() -> None:
     names = {
         _extension_name_to_str(ext.extension_name)
         for ext in xr.enumerate_instance_extension_properties()
@@ -787,7 +1044,7 @@ def check_openxr():
         print(f"       {ext}")
 
 
-def clear_eye(view_index: int):
+def clear_eye(view_index: int) -> None:
     from OpenGL import GL
 
     if view_index == 0:
@@ -802,12 +1059,37 @@ def main() -> int:
     args = parse_args()
 
     print("[INFO] Starting MuJoCo -> pyopenxr OpenGL (headless EGL).")
-    print("[INFO] HMD pose is ignored; MuJoCo endoscope cameras define the views.")
+    print("[INFO] HMD pose is ignored; MuJoCo fixed cameras define the views.")
+    print("[INFO] Comfort features: mono-to-both-eyes + stereo scene farther/nearer shift.")
+
     from .config_util import _default_config_path
+
     cfg_path = _default_config_path()
-    src = f"from {cfg_path}" if cfg_path.exists() else "defaults"
-    print(f"[INFO] Calibration ({src}): L=({args.calib_left_x:+d}, {args.calib_left_y:+d})  "
-          f"R=({args.calib_right_x:+d}, {args.calib_right_y:+d})")
+    has_calib = any((args.calib_left_x, args.calib_left_y, args.calib_right_x, args.calib_right_y))
+    has_comfort_cfg_src = cfg_path.exists()
+
+    if has_calib or has_comfort_cfg_src:
+        src = f"from {cfg_path}" if cfg_path.exists() else "from CLI"
+        if has_calib:
+            print(
+                f"[INFO] Calibration ({src}): "
+                f"L=({args.calib_left_x:+d}, {args.calib_left_y:+d})  "
+                f"R=({args.calib_right_x:+d}, {args.calib_right_y:+d})"
+            )
+
+    print(HINT)
+
+    comfort_state = RuntimeComfortState(
+        swap_eyes=args.swap_eyes,
+        mono_to_both_eyes=args.mono_to_both_eyes,
+        scene_farther_px=args.scene_farther_px,
+        scene_shift_step_px=args.scene_shift_step_px,
+        max_abs_scene_shift_px=args.max_scene_shift_px,
+        invert_scene_shift=args.invert_scene_shift,
+    )
+    comfort_state.clamp()
+
+    _print_comfort_state("[COMFORT]", comfort_state)
 
     # Important: create EGL context before touching pyopenxr ContextObject.
     provider = _NvidiaEGLContextProvider()
@@ -817,9 +1099,12 @@ def main() -> int:
     from xr.utils.gl import ContextObject
 
     renderer = None
+    stdin_reader = _StdinReader()
+
     start = time.perf_counter()
     last = start
     frames = 0
+    running = True
 
     try:
         with ContextObject(
@@ -842,13 +1127,16 @@ def main() -> int:
                     calib_left_y=args.calib_left_y,
                     calib_right_x=args.calib_right_x,
                     calib_right_y=args.calib_right_y,
+                    clear_rgb=tuple(args.clear_rgb),
                 )
 
                 _drain_gl_errors("after MujocoStereoRenderer.create")
 
-
             try:
                 for frame_index, frame_state in enumerate(xr_context.frame_loop()):
+                    if not running:
+                        break
+
                     t = time.perf_counter() - start
 
                     if renderer is not None:
@@ -857,23 +1145,27 @@ def main() -> int:
                             animate=not args.no_animate,
                         )
 
-                    for view_index, view in enumerate(
-                        xr_context.view_loop(frame_state)
-                    ):
+                    for view_index, _view in enumerate(xr_context.view_loop(frame_state)):
                         if renderer is None:
                             clear_eye(view_index)
                         else:
-                            renderer.render_eye(
-                                view_index,
-                                swap_eyes=args.swap_eyes,
-                            )
+                            renderer.render_eye(view_index, comfort_state)
 
                     frames += 1
                     now = time.perf_counter()
+
                     if now - last >= args.print_every:
-                        print(f"[INFO] FPS: {frames / (now - last):.1f}")
+                        fps = frames / (now - last)
+                        print(
+                            f"[INFO] FPS: {fps:.1f} "
+                            f"SCENE_FARTHER={comfort_state.scene_farther_px:+.1f}px "
+                            f"MONO={'on' if comfort_state.mono_to_both_eyes else 'off'} "
+                            f"SWAP={'on' if comfort_state.swap_eyes else 'off'}"
+                        )
                         frames = 0
                         last = now
+
+                    running = _handle_input(stdin_reader, comfort_state)
 
                     if args.max_frames > 0 and frame_index + 1 >= args.max_frames:
                         break
@@ -883,7 +1175,35 @@ def main() -> int:
                     renderer.close()
 
     finally:
+        stdin_reader.restore()
         provider.destroy()
+
+    print("\n[RESULT] Final comfort state:")
+    _print_comfort_state(" ", comfort_state)
+
+    if args.save:
+        from .config_util import Calibration, ComfortConfig, save_full_config
+
+        cal = Calibration(
+            left_x=args.calib_left_x,
+            left_y=args.calib_left_y,
+            right_x=args.calib_right_x,
+            right_y=args.calib_right_y,
+        )
+        comf = ComfortConfig(
+            mono_to_both_eyes=comfort_state.mono_to_both_eyes,
+            swap_eyes=comfort_state.swap_eyes,
+            scene_farther_px=comfort_state.scene_farther_px,
+            scene_shift_step_px=comfort_state.scene_shift_step_px,
+            max_abs_scene_shift_px=comfort_state.max_abs_scene_shift_px,
+            invert_scene_shift=comfort_state.invert_scene_shift,
+            clear_r=renderer.clear_r if renderer else 0.02,
+            clear_g=renderer.clear_g if renderer else 0.02,
+            clear_b=renderer.clear_b if renderer else 0.02,
+        )
+        from .config_util import _default_config_path
+        save_full_config(cal, comf)
+        print(f"[INFO] Saved calibration + comfort to {_default_config_path()}")
 
     return 0
 
