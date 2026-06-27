@@ -1,11 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import fcntl
 import os
-import select
-import sys
-import termios
 import time
 from dataclasses import dataclass
 
@@ -14,11 +10,13 @@ os.environ.setdefault("MUJOCO_GL", "egl")
 
 import xr
 
-
-_REQUIRED_EXTENSIONS = (
-    "XR_KHR_opengl_enable",
-    "XR_MNDX_egl_enable",
+from .xr_common import (
+    _REQUIRED_EXTENSIONS,
+    _StdinReader,
+    _extension_name_to_str,
+    check_openxr,
 )
+from .config_util import Calibration, _default_config_path, save_calibration
 
 
 HINT = """
@@ -37,12 +35,6 @@ r     reset all offsets and depth to zero
 s     save current offsets to calibration.toml
 q / esc quit (dumps current calibration)
 """
-
-
-def _extension_name_to_str(name) -> str:
-    if isinstance(name, bytes):
-        return name.decode()
-    return str(name)
 
 
 @dataclass
@@ -70,8 +62,8 @@ class CrosshairRenderer:
     invert_depth_sign: bool = False
 
     def _viewport_w_h(self) -> tuple[int, int]:
-        from OpenGL import GL
-
+        from .xr_common import _get_gl
+        GL = _get_gl()
         vp = GL.glGetIntegerv(GL.GL_VIEWPORT)
         return int(vp[2]), int(vp[3])
 
@@ -113,17 +105,15 @@ class CrosshairRenderer:
         half_depth = 0.5 * self.depth_disparity_px * sign
 
         if view_index == 0:
-            # Left eye.
             return self.offset_left_x + half_depth, self.offset_left_y
 
-        # Right eye.
         return self.offset_right_x - half_depth, self.offset_right_y
 
     def render(self, view_index: int) -> None:
-        from OpenGL import GL
+        from .xr_common import _get_gl
+        GL = _get_gl()
 
         w, h = self._viewport_w_h()
-
         px_x, px_y = self._effective_offsets_px(view_index)
 
         ox = self._normalized_offset(px_x, w)
@@ -207,33 +197,6 @@ class CrosshairRenderer:
         GL.glEnable(GL.GL_DEPTH_TEST)
 
 
-class _StdinReader:
-    def __init__(self):
-        self._fd = sys.stdin.fileno()
-        self._old = termios.tcgetattr(self._fd)
-        self._old_flags = fcntl.fcntl(self._fd, fcntl.F_GETFL)
-
-        new = termios.tcgetattr(self._fd)
-        new[3] = new[3] & ~(termios.ECHO | termios.ICANON)
-
-        termios.tcsetattr(self._fd, termios.TCSANOW, new)
-        fcntl.fcntl(self._fd, fcntl.F_SETFL, self._old_flags | os.O_NONBLOCK)
-
-    def restore(self):
-        termios.tcsetattr(self._fd, termios.TCSANOW, self._old)
-        fcntl.fcntl(self._fd, fcntl.F_SETFL, self._old_flags)
-
-    def read_key(self) -> str | None:
-        if select.select([sys.stdin], [], [], 0)[0]:
-            try:
-                data = os.read(self._fd, 16)
-                return data.decode(errors="replace")
-            except (OSError, BlockingIOError):
-                pass
-
-        return None
-
-
 def _print_state(prefix: str, renderer: CrosshairRenderer, end: str = "\n") -> None:
     print(
         f"{prefix} "
@@ -309,18 +272,14 @@ def _handle_input(reader: _StdinReader, renderer: CrosshairRenderer) -> bool:
         changed = True
 
     elif ch == "s":
-        from .config_util import Calibration, save_calibration, _default_config_path
-
         cal = Calibration(
             left_x=renderer.offset_left_x,
             left_y=renderer.offset_left_y,
             right_x=renderer.offset_right_x,
             right_y=renderer.offset_right_y,
         )
-
         cfg_path = _default_config_path()
         save_calibration(cal)
-
         print(f"\r[SAVED] {cfg_path} offsets only", flush=True)
 
     if changed:
@@ -329,15 +288,13 @@ def _handle_input(reader: _StdinReader, renderer: CrosshairRenderer) -> bool:
     return True
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     from .config_util import load_calibration
-
     calib = load_calibration()
 
     parser = argparse.ArgumentParser(
         description="OpenXR crosshair calibration tool with adjustable stereo depth."
     )
-
     parser.add_argument(
         "--print-every",
         type=float,
@@ -351,21 +308,18 @@ def parse_args():
         default=calib.left_x if calib else 0,
         help="Initial left-eye horizontal offset in pixels.",
     )
-
     parser.add_argument(
         "--offset-left-y",
         type=int,
         default=calib.left_y if calib else 0,
         help="Initial left-eye vertical offset in pixels.",
     )
-
     parser.add_argument(
         "--offset-right-x",
         type=int,
         default=calib.right_x if calib else 0,
         help="Initial right-eye horizontal offset in pixels.",
     )
-
     parser.add_argument(
         "--offset-right-y",
         type=int,
@@ -379,33 +333,28 @@ def parse_args():
         default=0.0,
         help="Initial stereo depth disparity in pixels. Positive usually means nearer.",
     )
-
     parser.add_argument(
         "--depth-step-px",
         type=float,
         default=1.0,
         help="Stereo depth adjustment step in pixels.",
     )
-
     parser.add_argument(
         "--max-depth-px",
         type=float,
         default=80.0,
         help="Maximum absolute stereo depth disparity in pixels.",
     )
-
     parser.add_argument(
         "--invert-depth-sign",
         action="store_true",
         help="Invert stereo depth sign if near/far direction feels reversed.",
     )
-
     parser.add_argument(
         "--save",
         action="store_true",
         help="Save calibration offsets to config file on exit.",
     )
-
     parser.add_argument(
         "--save-on-quit",
         dest="save",
@@ -416,26 +365,10 @@ def parse_args():
     return parser.parse_args()
 
 
-def check_openxr():
-    names = {
-        _extension_name_to_str(ext.extension_name)
-        for ext in xr.enumerate_instance_extension_properties()
-    }
-
-    for ext in _REQUIRED_EXTENSIONS:
-        if ext not in names:
-            raise RuntimeError(f"{ext} is not available")
-
-    print("[INFO] Required OpenXR extensions available:")
-
-    for ext in _REQUIRED_EXTENSIONS:
-        print(f"  {ext}")
-
-
 def main() -> int:
     args = parse_args()
 
-    from .xr_mujoco_opengl import _NvidiaEGLContextProvider
+    from .xr_common import _NvidiaEGLContextProvider
 
     print("[INFO] Crosshair Calibration — OpenXR")
     print("[INFO] Both eyes receive a 2D crosshair pattern.")
@@ -449,8 +382,6 @@ def main() -> int:
             args.offset_right_y,
         )
     ):
-        from .config_util import _default_config_path
-
         src = _default_config_path()
         label = "config" if src.exists() else "CLI"
 
@@ -463,7 +394,6 @@ def main() -> int:
     print(HINT)
 
     provider = _NvidiaEGLContextProvider()
-
     check_openxr()
 
     from xr.utils.gl import ContextObject
@@ -535,18 +465,14 @@ def main() -> int:
     print(f"  Stereo depth disparity: {renderer.depth_disparity_px:+.1f}px")
 
     if args.save:
-        from .config_util import Calibration, save_calibration, _default_config_path
-
         cal = Calibration(
             left_x=renderer.offset_left_x,
             left_y=renderer.offset_left_y,
             right_x=renderer.offset_right_x,
             right_y=renderer.offset_right_y,
         )
-
         cfg_path = _default_config_path()
         save_calibration(cal)
-
         print(f"[INFO] Saved calibration offsets to {cfg_path}")
 
     return 0

@@ -40,7 +40,7 @@ pixi run start-monado          # tmux session 中运行
 pixi run xr-pink-world
 
 # 5. 双目立体渲染（comfort 控制）
-pixi run xr-comfort
+pixi run xr-mujoco-opengl
 
 # 6. 退出后切回桌面
 sudo chvt 2
@@ -53,8 +53,7 @@ sudo chvt 2
 | 任务 | 说明 |
 |------|------|
 | `pixi run xr-pink-world` | OpenXR 连通性测试（左眼红色、右眼蓝色） |
-| `pixi run xr-mujoco-opengl` | 基础双目 MuJoCo 渲染（mono-to-both-eyes 模式） |
-| `pixi run xr-comfort` | 带实时 comfort 控制的双目渲染（推荐用于调试） |
+| `pixi run xr-mujoco-opengl` | 带实时 comfort 控制的双目 MuJoCo 渲染（推荐） |
 | `pixi run xr-surgical` | 手术 continuum robot standalone VR 预览 |
 | `pixi run xr-crosshair` | 十字线标定工具（解决零视差偏移） |
 | `pixi run start-monado` | 启动 Monado OpenXR runtime |
@@ -72,8 +71,8 @@ sudo chvt 2
 ```
 mujoco_vive_scripts/                    ← Python 包（活跃开发）
 ├── mujoco_vive_scripts/
-│   ├── xr_mujoco_opengl_comfort.py     ← 核心渲染 + comfort 控制（自包含，EGL context + stdin reader）
-│   ├── xr_mujoco_opengl.py             ← 简化版双目渲染 + calib 补偿
+│   ├── xr_mujoco_opengl.py             ← 核心：EGL + OpenXR + comfort 控制
+│   ├── xr_common.py                    ← 共享基础设施（EGL context / stdin / argparse 工厂）
 │   ├── xr_surgical_robot.py            ← 手术机器人桥接，对外暴露 render_loop()
 │   ├── xr_crosshair_calibration.py     ← 十字线标定工具（纯 GL，无 MuJoCo）
 │   ├── xr_pink_world_check.py          ← OpenXR 连通性测试
@@ -88,7 +87,6 @@ mujoco_vive_scripts/                    ← Python 包（活跃开发）
 ├── scripts/                            ← shell wrapper 脚本
 └── pyproject.toml
 
-mujoco_vive_stage1/                     ← stage1 副本（与主包保持同步）
 script_test/                            ← Monado/VIVE TTY 测试脚本
 ```
 

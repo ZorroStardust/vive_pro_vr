@@ -46,9 +46,9 @@
 
 ```
 mujoco_vive_scripts/mujoco_vive_scripts/
-├── xr_mujoco_opengl_comfort.py    ← 核心：EGL + OpenXR + comfort 控制（自包含）
-├── xr_mujoco_opengl.py            ← 简化版：基础双目 + calib 补偿
-├── xr_surgical_robot.py           ← 手术机器人桥接 + render_loop()
+├── xr_mujoco_opengl.py            ← 核心：EGL + OpenXR + comfort 控制
+├── xr_common.py                   ← 共享基础设施（EGL context / stdin / argparse 工厂）
+├── xr_surgical_robot.py           ← 手术机器人桥接 + render_loop()（继承 MujocoStereoRenderer）
 ├── xr_crosshair_calibration.py    ← 十字线标定工具
 ├── xr_pink_world_check.py         ← OpenXR 连通性测试（红/蓝纯色）
 ├── openxr_env_check.py            ← 环境诊断（USB、扩展、GL）
@@ -58,12 +58,11 @@ mujoco_vive_scripts/mujoco_vive_scripts/
 ├── list_monitors.py               ← GLFW 显示器列表
 │
 ├── models/
-│   └── stereo_endoscope_test.xml  ← comfort 脚本默认测试模型
+│   └── stereo_endoscope_test.xml  ← xr-mujoco-opengl 默认测试模型
 │
 └── calibration.toml               ← 标定 + comfort 持久化配置
 
 scripts/
-├── run_xr_comfort.sh
 ├── run_xr_mujoco_opengl.sh
 ├── run_xr_surgical.sh
 ├── run_xr_crosshair.sh
@@ -88,18 +87,24 @@ RuntimeComfortState ──实时修改──→ s 键保存 ──→ save_full_
 
 ## 核心模块详解
 
-### `xr_mujoco_opengl_comfort.py` — 渲染 + Comfort 控制
+### `xr_mujoco_opengl.py` — 渲染 + Comfort 控制
 
-自包含模块，包含完整 EGL context provider、stdin reader、comfort state、键盘处理。
+核心入口模块。EGL context provider、stdin reader、comfort state、键盘处理都已迁移到 `xr_common.py` 中共享；本模块只保留 `MujocoStereoRenderer`（基础渲染器）和 `main()`。
+
+| 组件 | 职责 |
+|------|------|
+| `MujocoStereoRenderer` | MuJoCo 双目渲染器：FIXED 相机模式、fovy zoom、viewport 偏移补偿 |
+| `render_eye()` | `mjv_updateScene` → `glClear` → `mjr_render` |
+
+`xr_common.py` 提供：
 
 | 组件 | 职责 |
 |------|------|
 | `_NvidiaEGLContextProvider` | 原始 ctypes 调用 libEGL：枚举 GPU → 创建 pbuffer surface → 绑定 OpenGL 兼容 profile |
 | `_StdinReader` | 非阻塞 tty 单键读取（termios + fcntl + select） |
 | `RuntimeComfortState` | 运行时 comfort 参数容器：zoom、scene_farther、mono、swap |
-| `MujocoStereoRenderer` | MuJoCo 双目渲染器：FIXED 相机模式、fovy zoom、viewport 偏移补偿 |
 | `_handle_input` | 键盘派发：`a/d/e/p/o/z/x/s/q` |
-| `render_eye()` | `mjv_updateScene` → `glClear` → `mjr_render` |
+| `add_calibration_args` / `add_comfort_args` | argparse 工厂，3 个脚本共享 CLI 表面 |
 
 **渲染流程（每帧每眼）：**
 ```
@@ -183,8 +188,7 @@ clear_b = 0.02
 | 任务 | 说明 |
 |------|------|
 | `pixi run xr-pink-world` | OpenXR 连通性测试（左红右蓝） |
-| `pixi run xr-mujoco-opengl` | 基础双目渲染（默认 comfort 模型） |
-| `pixi run xr-comfort` | 带 comfort 控制的双目渲染 |
+| `pixi run xr-mujoco-opengl` | 带 comfort 控制的双目渲染（默认 stereo_endoscope_test 模型） |
 | `pixi run xr-crosshair` | 十字线标定工具 |
 | `pixi run xr-surgical` | 手术机器人 standalone VR 预览 |
 | `pixi run start-monado` | 启动 Monado OpenXR runtime |
@@ -205,7 +209,7 @@ sudo chvt 3
 pixi run start-monado
 
 # 3. 运行任一 VR 脚本
-pixi run xr-comfort      # comfort 模型调试
+pixi run xr-mujoco-opengl  # comfort 模型调试
 pixi run xr-surgical     # 手术机器人预览
 pixi run xr-crosshair    # 标定
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -75,16 +75,56 @@ def load_comfort(path: str | Path | None = None) -> ComfortConfig | None:
     )
 
 
-def _format_section(name: str, items: list[tuple[str, str | int | float | bool]]) -> str:
+def _format_value(val) -> str:
+    if isinstance(val, bool):
+        return "true" if val else "false"
+    if isinstance(val, float):
+        return f"{val:g}"
+    return str(val)
+
+
+def _format_section(name: str, items: list[tuple[str, object]]) -> str:
     lines = [f"[{name}]"]
     for key, val in items:
-        if isinstance(val, bool):
-            lines.append(f"{key} = {'true' if val else 'false'}")
-        elif isinstance(val, float):
-            lines.append(f"{key} = {val:g}")
-        else:
-            lines.append(f"{key} = {val}")
+        lines.append(f"{key} = {_format_value(val)}")
     return "\n".join(lines) + "\n"
+
+
+_CALIBRATION_ITEMS = [
+    ("left_x", "left_x"),
+    ("left_y", "left_y"),
+    ("right_x", "right_x"),
+    ("right_y", "right_y"),
+]
+
+
+def _format_calibration_section(cal: Calibration) -> str:
+    return _format_section(
+        "calibration",
+        [(key, getattr(cal, attr)) for key, attr in _CALIBRATION_ITEMS],
+    )
+
+
+_COMFORT_ITEMS = [
+    ("mono_to_both_eyes", "mono_to_both_eyes"),
+    ("swap_eyes", "swap_eyes"),
+    ("scene_farther_px", "scene_farther_px"),
+    ("scene_shift_step_px", "scene_shift_step_px"),
+    ("max_abs_scene_shift_px", "max_abs_scene_shift_px"),
+    ("invert_scene_shift", "invert_scene_shift"),
+    ("zoom", "zoom"),
+    ("zoom_step", "zoom_step"),
+    ("clear_r", "clear_r"),
+    ("clear_g", "clear_g"),
+    ("clear_b", "clear_b"),
+]
+
+
+def _format_comfort_section(c: ComfortConfig) -> str:
+    return _format_section(
+        "comfort",
+        [(key, getattr(c, attr)) for key, attr in _COMFORT_ITEMS],
+    )
 
 
 def save_calibration(
@@ -96,28 +136,9 @@ def save_calibration(
 
     comfort = load_comfort(p)
 
-    cal_section = _format_section("calibration", [
-        ("left_x", cal.left_x),
-        ("left_y", cal.left_y),
-        ("right_x", cal.right_x),
-        ("right_y", cal.right_y),
-    ])
-
-    parts = [cal_section]
+    parts = [_format_calibration_section(cal)]
     if comfort is not None:
-        parts.append(_format_section("comfort", [
-            ("mono_to_both_eyes", comfort.mono_to_both_eyes),
-            ("swap_eyes", comfort.swap_eyes),
-            ("scene_farther_px", comfort.scene_farther_px),
-            ("scene_shift_step_px", comfort.scene_shift_step_px),
-            ("max_abs_scene_shift_px", comfort.max_abs_scene_shift_px),
-            ("invert_scene_shift", comfort.invert_scene_shift),
-            ("zoom", comfort.zoom),
-            ("zoom_step", comfort.zoom_step),
-            ("clear_r", comfort.clear_r),
-            ("clear_g", comfort.clear_g),
-            ("clear_b", comfort.clear_b),
-        ]))
+        parts.append(_format_comfort_section(comfort))
 
     p.write_text("\n".join(parts) + "\n")
 
@@ -133,26 +154,8 @@ def save_comfort(
 
     parts: list[str] = []
     if cal is not None:
-        parts.append(_format_section("calibration", [
-            ("left_x", cal.left_x),
-            ("left_y", cal.left_y),
-            ("right_x", cal.right_x),
-            ("right_y", cal.right_y),
-        ]))
-
-    parts.append(_format_section("comfort", [
-        ("mono_to_both_eyes", c.mono_to_both_eyes),
-        ("swap_eyes", c.swap_eyes),
-        ("scene_farther_px", c.scene_farther_px),
-        ("scene_shift_step_px", c.scene_shift_step_px),
-        ("max_abs_scene_shift_px", c.max_abs_scene_shift_px),
-        ("invert_scene_shift", c.invert_scene_shift),
-        ("zoom", c.zoom),
-        ("zoom_step", c.zoom_step),
-        ("clear_r", c.clear_r),
-        ("clear_g", c.clear_g),
-        ("clear_b", c.clear_b),
-    ]))
+        parts.append(_format_calibration_section(cal))
+    parts.append(_format_comfort_section(c))
 
     p.write_text("\n".join(parts) + "\n")
 
@@ -165,26 +168,8 @@ def save_full_config(
     p = Path(path) if path else _default_config_path()
     p.parent.mkdir(parents=True, exist_ok=True)
 
-    parts = [
-        _format_section("calibration", [
-            ("left_x", cal.left_x),
-            ("left_y", cal.left_y),
-            ("right_x", cal.right_x),
-            ("right_y", cal.right_y),
-        ]),
-        _format_section("comfort", [
-            ("mono_to_both_eyes", comfort.mono_to_both_eyes),
-            ("swap_eyes", comfort.swap_eyes),
-            ("scene_farther_px", comfort.scene_farther_px),
-            ("scene_shift_step_px", comfort.scene_shift_step_px),
-            ("max_abs_scene_shift_px", comfort.max_abs_scene_shift_px),
-            ("invert_scene_shift", comfort.invert_scene_shift),
-            ("zoom", comfort.zoom),
-            ("zoom_step", comfort.zoom_step),
-            ("clear_r", comfort.clear_r),
-            ("clear_g", comfort.clear_g),
-            ("clear_b", comfort.clear_b),
-        ]),
-    ]
-
-    p.write_text("\n".join(parts) + "\n")
+    p.write_text(
+        _format_calibration_section(cal)
+        + _format_comfort_section(comfort)
+        + "\n"
+    )

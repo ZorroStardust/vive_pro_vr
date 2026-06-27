@@ -5,40 +5,39 @@ import os
 import sys
 import threading
 import time
-from dataclasses import dataclass
 from pathlib import Path
 
 os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
 os.environ.setdefault("MUJOCO_GL", "egl")
 
 import mujoco as mj
-import numpy as np
 import xr
 
-ROBOT_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent / "surgical_continuum_robot"
-sys.path.insert(0, str(ROBOT_PROJECT_ROOT / "remote_control_ex"))
-
-from .xr_mujoco_opengl_comfort import (  # noqa: E402
-    _NvidiaEGLContextProvider,
-    _StdinReader,
-    _REQUIRED_EXTENSIONS,
-    _drain_gl_errors,
-    _extension_name_to_str,
-    _print_comfort_state,
-    _handle_input,
-    RuntimeComfortState,
+from .xr_common import (
     HINT,
+    RuntimeComfortState,
+    _NvidiaEGLContextProvider,
+    _REQUIRED_EXTENSIONS,
+    _StdinReader,
+    _drain_gl_errors,
+    _handle_input,
+    _print_comfort_state,
+    add_calibration_args,
+    add_comfort_args,
     check_openxr,
 )
-
-from .config_util import (  # noqa: E402
+from .xr_mujoco_opengl import MujocoStereoRenderer
+from .config_util import (
     Calibration,
     ComfortConfig,
+    _default_config_path,
     load_calibration,
     load_comfort,
     save_full_config,
-    _default_config_path,
 )
+
+ROBOT_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent / "surgical_continuum_robot"
+sys.path.insert(0, str(ROBOT_PROJECT_ROOT / "remote_control_ex"))
 
 from teleop_core.scene import MujocoScene  # noqa: E402
 from teleop_core.config import (  # noqa: E402
@@ -59,22 +58,12 @@ DEFAULT_RIGHT_CAM = "up_cam2"
 MAX_GEOM = 50000
 
 
-@dataclass
-class SurgicalStereoRenderer:
-    model: mj.MjModel
-    data: mj.MjData
-    left_id: int
-    right_id: int
-    scene: mj.MjvScene
-    mjr_context: mj.MjrContext
-    camera: mj.MjvCamera
-    calib_left_x: int = 0
-    calib_left_y: int = 0
-    calib_right_x: int = 0
-    calib_right_y: int = 0
-    clear_r: float = 0.02
-    clear_g: float = 0.02
-    clear_b: float = 0.02
+class SurgicalStereoRenderer(MujocoStereoRenderer):
+    """Render-only subclass of :class:`MujocoStereoRenderer` for shared model/data.
+
+    The base class's :py:meth:`step` is intentionally not called: physics is
+    driven by an external simulation thread that the caller owns.
+    """
 
     @classmethod
     def create(
@@ -89,15 +78,12 @@ class SurgicalStereoRenderer:
         calib_right_y: int = 0,
         clear_rgb: tuple[float, float, float] = (0.02, 0.02, 0.02),
     ):
-        left_id = mj.mj_name2id(model, mj.mjtObj.mjOBJ_CAMERA, left_camera)
-        right_id = mj.mj_name2id(model, mj.mjtObj.mjOBJ_CAMERA, right_camera)
-        if left_id < 0:
-            raise RuntimeError(f"Camera not found: {left_camera}")
-        if right_id < 0:
-            raise RuntimeError(f"Camera not found: {right_camera}")
+        left_id, right_id = cls._resolve_cameras(model, left_camera, right_camera)
+
+        option = mj.MjvOption()
 
         _drain_gl_errors("before MjrContext (surgical)")
-        mjr_context = mj.MjrContext(model, mj.mjtFontScale.mjFONTSCALE_150)
+        context = mj.MjrContext(model, mj.mjtFontScale.mjFONTSCALE_150)
         _drain_gl_errors("after MjrContext (surgical)")
 
         scene = mj.MjvScene(model, maxgeom=MAX_GEOM)
@@ -108,9 +94,11 @@ class SurgicalStereoRenderer:
             data=data,
             left_id=left_id,
             right_id=right_id,
+            option=option,
             scene=scene,
-            mjr_context=mjr_context,
+            context=context,
             camera=camera,
+            spin_qposadr=None,
             calib_left_x=calib_left_x,
             calib_left_y=calib_left_y,
             calib_right_x=calib_right_x,
@@ -119,77 +107,6 @@ class SurgicalStereoRenderer:
             clear_g=clear_rgb[1],
             clear_b=clear_rgb[2],
         )
-
-    def _camera_for_eye(self, view_index: int, state: RuntimeComfortState) -> int:
-        if state.mono_to_both_eyes:
-            return self.left_id
-        if view_index == 0:
-            return self.right_id if state.swap_eyes else self.left_id
-        return self.left_id if state.swap_eyes else self.right_id
-
-    def _calib_for_eye(self, view_index: int) -> tuple[int, int]:
-        if view_index == 0:
-            return self.calib_left_x, self.calib_left_y
-        return self.calib_right_x, self.calib_right_y
-
-    def _comfort_shift_for_eye(self, view_index: int, state: RuntimeComfortState) -> float:
-        sign = -1.0 if state.invert_scene_shift else 1.0
-        half = 0.5 * state.scene_farther_px * sign
-        if view_index == 0:
-            return -half
-        return half
-
-    def render_eye(self, view_index: int, state: RuntimeComfortState) -> None:
-        from OpenGL import GL
-
-        cam_id = self._camera_for_eye(view_index, state)
-
-        self.camera.type = mj.mjtCamera.mjCAMERA_FIXED
-        self.camera.fixedcamid = cam_id
-
-        original_fovy = float(self.model.cam_fovy[cam_id])
-        self.model.cam_fovy[cam_id] = original_fovy / max(state.zoom, 0.1)
-
-        mj.mjv_updateScene(
-            self.model,
-            self.data,
-            mj.MjvOption(),
-            None,
-            self.camera,
-            mj.mjtCatBit.mjCAT_ALL,
-            self.scene,
-        )
-
-        self.model.cam_fovy[cam_id] = original_fovy
-
-        viewport = GL.glGetIntegerv(GL.GL_VIEWPORT)
-        vp_x = int(viewport[0])
-        vp_y = int(viewport[1])
-        vp_w = int(viewport[2])
-        vp_h = int(viewport[3])
-
-        calib_x, calib_y = self._calib_for_eye(view_index)
-        comfort_x = self._comfort_shift_for_eye(view_index, state)
-
-        _drain_gl_errors(f"before render_eye {view_index}")
-
-        GL.glEnable(GL.GL_DEPTH_TEST)
-        GL.glClearColor(self.clear_r, self.clear_g, self.clear_b, 1.0)
-        GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
-
-        rect = mj.MjrRect(
-            int(round(vp_x + calib_x + comfort_x)),
-            int(round(vp_y + calib_y)),
-            vp_w,
-            vp_h,
-        )
-
-        mj.mjr_render(rect, self.scene, self.mjr_context)
-
-        _drain_gl_errors(f"after mjr_render eye {view_index}", print_limit=2)
-
-    def close(self) -> None:
-        self.mjr_context.free()
 
 
 class SurgicalSimLoop:
@@ -375,7 +292,7 @@ def render_loop(
         _print_comfort_state(" ", comfort_state)
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     calib = load_calibration()
     comfort = load_comfort()
 
@@ -392,49 +309,8 @@ def parse_args():
     parser.add_argument("--max-frames", type=int, default=0)
     parser.add_argument("--print-every", type=float, default=2.0)
 
-    parser.add_argument(
-        "--swap-eyes", action="store_true",
-        default=comfort.swap_eyes if comfort else False,
-    )
-    parser.add_argument(
-        "--mono-to-both-eyes", action="store_true",
-        default=comfort.mono_to_both_eyes if comfort else False,
-    )
-    parser.add_argument(
-        "--scene-farther-px", type=float,
-        default=comfort.scene_farther_px if comfort else 0.0,
-    )
-    parser.add_argument(
-        "--scene-shift-step-px", type=float,
-        default=comfort.scene_shift_step_px if comfort else 2.0,
-    )
-    parser.add_argument(
-        "--max-scene-shift-px", type=float,
-        default=comfort.max_abs_scene_shift_px if comfort else 80.0,
-    )
-    parser.add_argument(
-        "--invert-scene-shift", action="store_true",
-        default=comfort.invert_scene_shift if comfort else False,
-    )
-    parser.add_argument(
-        "--zoom", type=float,
-        default=comfort.zoom if comfort else 1.0,
-    )
-    parser.add_argument(
-        "--zoom-step", type=float,
-        default=comfort.zoom_step if comfort else 0.1,
-    )
-    parser.add_argument("--clear-rgb", type=float, nargs=3, metavar=("R", "G", "B"),
-                        default=comfort.to_rgb_tuple() if comfort else (0.02, 0.02, 0.02))
-    parser.add_argument("--calib-left-x", type=int,
-                        default=calib.left_x if calib else 0)
-    parser.add_argument("--calib-left-y", type=int,
-                        default=calib.left_y if calib else 0)
-    parser.add_argument("--calib-right-x", type=int,
-                        default=calib.right_x if calib else 0)
-    parser.add_argument("--calib-right-y", type=int,
-                        default=calib.right_y if calib else 0)
-    parser.add_argument("--save", action="store_true")
+    add_calibration_args(parser, calib)
+    add_comfort_args(parser, comfort)
 
     return parser.parse_args()
 
@@ -447,7 +323,9 @@ def main() -> int:
     print("[INFO] Cameras:", args.left_camera, "/", args.right_camera)
 
     cfg_path = _default_config_path()
-    has_calib = any((args.calib_left_x, args.calib_left_y, args.calib_right_x, args.calib_right_y))
+    has_calib = any(
+        (args.calib_left_x, args.calib_left_y, args.calib_right_x, args.calib_right_y)
+    )
     if has_calib:
         src = f"from {cfg_path}" if cfg_path.exists() else "CLI"
         print(f"[INFO] Calibration ({src}): "
@@ -465,6 +343,14 @@ def main() -> int:
         zoom_step=args.zoom_step,
     )
     comfort_state.clamp()
+
+    if not ROBOT_PROJECT_ROOT.exists():
+        raise FileNotFoundError(
+            f"surgical_continuum_robot project not found at {ROBOT_PROJECT_ROOT}. "
+            "This script requires the sibling teleop_core / remote_control_ex "
+            "directories; either check out the robot project next to "
+            "vive_pro_vr or use xr_mujoco_opengl.py for a self-contained demo."
+        )
 
     mjcf_dir = ROBOT_PROJECT_ROOT / "model" / "continuum_robot" / "mjcf"
     xml_path = mjcf_dir / args.model
