@@ -681,6 +681,12 @@ class RuntimeComfortState:
     swap_eyes: bool = False
     mono_to_both_eyes: bool = False
 
+    # mono_fast: when True AND mono_to_both_eyes is True, the renderer builds
+    # the MuJoCo scene once per frame into an offscreen FBO and blits that
+    # texture to both eye viewports, halving ``mjv_updateScene`` / ``mjr_render``
+    # cost.  Currently honoured by ``MujocoStereoRenderer.render_eye``.
+    mono_fast: bool = False
+
     # Positive scene_farther_px shifts left-eye image left and right-eye image right.
     # This usually reduces crossed disparity and makes the scene feel farther.
     scene_farther_px: float = 0.0
