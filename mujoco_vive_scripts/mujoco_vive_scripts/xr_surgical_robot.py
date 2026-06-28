@@ -150,6 +150,7 @@ def render_loop(
     print_every: float = 2.0,
     print_diagnostics: bool = True,
     clutch_callback=None,
+    key_callback=None,
     sink: OpenXRSink | ScreenSink | None = None,
     vr_window: bool = False,
     vr_window_size: float = 0.7,
@@ -261,6 +262,9 @@ def render_loop(
                 def _unhandled_cb(ch: str) -> bool:
                     if ch == " " and clutch_callback is not None:
                         clutch_callback()
+                        return True
+                    if key_callback is not None:
+                        key_callback(ch)
                         return True
                     return True
 
