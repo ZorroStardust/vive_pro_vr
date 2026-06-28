@@ -19,21 +19,14 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# Must be set before importing PyOpenGL.
+# Env vars deferred: EGL is set inside OpenXRSink; GLFW uses platform default.
 # Do not import OpenGL.GL at module top.
-os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
-
-# We are using our own EGL context provider.
-os.environ.setdefault("MUJOCO_GL", "egl")
 
 import mujoco
-import xr
 
 from .xr_common import (
     HINT,
     RuntimeComfortState,
-    _NvidiaEGLContextProvider,
-    _REQUIRED_EXTENSIONS,
     _StdinReader,
     _drain_gl_errors,
     _get_gl,
@@ -41,7 +34,8 @@ from .xr_common import (
     _print_comfort_state,
     add_calibration_args,
     add_comfort_args,
-    check_openxr,
+    add_screen_args,
+    make_sink,
 )
 from .config_util import (
     Calibration,
@@ -223,14 +217,11 @@ class MujocoStereoRenderer:
     timings: RenderTimings = field(default_factory=RenderTimings)
     mono_fbo: _MonoFBOBlitter | None = None
 
-    # Cached viewport per frame: set in main() before the view loop runs and
-    # cleared at frame end.  For a static HMD both eyes share the same image
-    # size, so we can skip the second ``glGetIntegerv`` call.
-    _cached_viewport: tuple[int, int, int, int] | None = field(default=None, init=False, repr=False)
+    _pre_cleared: bool = False
 
     def begin_frame(self) -> None:
         """Call once per frame before the eye loop starts."""
-        self._cached_viewport = None
+        pass
 
     @classmethod
     def create(
@@ -346,25 +337,9 @@ class MujocoStereoRenderer:
         return half_farther
 
     def _viewport_for(self, view_index: int, GL) -> tuple[int, int, int, int]:
-        """Return ``(vp_x, vp_y, vp_w, vp_h)`` for ``view_index``.
-
-        The swapchain image size is constant for a static HMD, so we cache the
-        viewport on the first eye of each frame and reuse it for the second.
-        """
-        cached = self._cached_viewport
-        if cached is not None and view_index > 0:
-            return cached
-
-        viewport = GL.glGetIntegerv(GL.GL_VIEWPORT)
-        vp = (
-            int(viewport[0]),
-            int(viewport[1]),
-            int(viewport[2]),
-            int(viewport[3]),
-        )
-        if view_index == 0:
-            self._cached_viewport = vp
-        return vp
+        """Return ``(vp_x, vp_y, vp_w, vp_h)`` for the current viewport."""
+        vp = GL.glGetIntegerv(GL.GL_VIEWPORT)
+        return (int(vp[0]), int(vp[1]), int(vp[2]), int(vp[3]))
 
     def render_eye(self, view_index: int, state: RuntimeComfortState) -> None:
         """Render one eye's view to the currently-bound swapchain FBO.
@@ -436,8 +411,9 @@ class MujocoStereoRenderer:
                 self.mono_fbo.bind_for_render(GL)
 
             GL.glEnable(GL.GL_DEPTH_TEST)
-            GL.glClearColor(self.clear_r, self.clear_g, self.clear_b, 1.0)
-            GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
+            if not self._pre_cleared:
+                GL.glClearColor(self.clear_r, self.clear_g, self.clear_b, 1.0)
+                GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
             if use_mono_fast:
                 rect = mujoco.MjrRect(0, 0, vp_w, vp_h)
@@ -527,6 +503,7 @@ def parse_args() -> argparse.Namespace:
 
     add_calibration_args(parser, calib)
     add_comfort_args(parser, comfort)
+    add_screen_args(parser)
 
     return parser.parse_args()
 
@@ -543,7 +520,8 @@ def clear_eye(view_index: int) -> None:
 
 
 def _print_banner(args: argparse.Namespace, cfg_path: Path) -> None:
-    print("[INFO] Starting MuJoCo -> pyopenxr OpenGL (headless EGL).")
+    mode = "SCREEN (GLFW window)" if args.screen else "OpenXR (headless EGL)"
+    print(f"[INFO] Starting MuJoCo stereo — {mode}.")
     print("[INFO] HMD pose is ignored; MuJoCo fixed cameras define the views.")
     print("[INFO] Comfort features: mono-to-both-eyes + stereo scene farther/nearer shift.")
 
@@ -614,11 +592,7 @@ def main() -> int:
 
     _print_comfort_state("[COMFORT]", comfort_state)
 
-    # Important: create EGL context before touching pyopenxr ContextObject.
-    provider = _NvidiaEGLContextProvider()
-    check_openxr()
-
-    from xr.utils.gl import ContextObject
+    sink = make_sink(args)
 
     renderer = None
     stdin_reader = _StdinReader()
@@ -626,18 +600,14 @@ def main() -> int:
     start = time.perf_counter()
     last = start
     frames = 0
+    frame_index = 0
     running = True
 
     try:
-        with ContextObject(
-            context_provider=provider,
-            instance_create_info=xr.InstanceCreateInfo(
-                enabled_extension_names=list(_REQUIRED_EXTENSIONS),
-            ),
-        ) as xr_context:
+        with sink as s:
 
             if not args.clear_only:
-                provider.make_current()
+                s.make_current()
                 _drain_gl_errors("before MujocoStereoRenderer.create")
 
                 renderer = MujocoStereoRenderer.create(
@@ -654,8 +624,11 @@ def main() -> int:
 
                 _drain_gl_errors("after MujocoStereoRenderer.create")
 
+            if args.screen and renderer is not None:
+                renderer._pre_cleared = True
+
             try:
-                for frame_index, frame_state in enumerate(xr_context.frame_loop()):
+                for frame_state in s.frame_loop():
                     if not running:
                         break
 
@@ -671,13 +644,14 @@ def main() -> int:
                         )
                         t_step_end = time.perf_counter()
 
-                    for view_index, _view in enumerate(xr_context.view_loop(frame_state)):
+                    for view_index, _view in enumerate(s.view_loop(frame_state)):
                         if renderer is None:
                             clear_eye(view_index)
                         else:
                             renderer.render_eye(view_index, comfort_state)
 
                     frames += 1
+                    frame_index += 1
                     now = time.perf_counter()
 
                     if now - last >= args.print_every:
@@ -710,7 +684,7 @@ def main() -> int:
 
                     running = _handle_input(stdin_reader, comfort_state)
 
-                    if args.max_frames > 0 and frame_index + 1 >= args.max_frames:
+                    if args.max_frames > 0 and frame_index >= args.max_frames:
                         break
 
             finally:
@@ -719,7 +693,6 @@ def main() -> int:
 
     finally:
         stdin_reader.restore()
-        provider.destroy()
 
     print("\n[RESULT] Final comfort state:")
     _print_comfort_state(" ", comfort_state)

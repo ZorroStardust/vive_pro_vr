@@ -5,16 +5,10 @@ import os
 import time
 from dataclasses import dataclass
 
-os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
-os.environ.setdefault("MUJOCO_GL", "egl")
-
-import xr
-
 from .xr_common import (
-    _REQUIRED_EXTENSIONS,
     _StdinReader,
-    _extension_name_to_str,
-    check_openxr,
+    add_screen_args,
+    make_sink,
 )
 from .config_util import Calibration, _default_config_path, save_calibration
 
@@ -60,6 +54,8 @@ class CrosshairRenderer:
     depth_step_px: float = 1.0
     max_depth_disparity_px: float = 80.0
     invert_depth_sign: bool = False
+
+    _pre_cleared: bool = False
 
     def _viewport_w_h(self) -> tuple[int, int]:
         from .xr_common import _get_gl
@@ -119,8 +115,9 @@ class CrosshairRenderer:
         ox = self._normalized_offset(px_x, w)
         oy = self._normalized_offset(px_y, h)
 
-        GL.glClearColor(0.0, 0.0, 0.0, 1.0)
-        GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
+        if not self._pre_cleared:
+            GL.glClearColor(0.0, 0.0, 0.0, 1.0)
+            GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
 
         GL.glDisable(GL.GL_DEPTH_TEST)
 
@@ -362,15 +359,16 @@ def parse_args() -> argparse.Namespace:
         help=argparse.SUPPRESS,
     )
 
+    add_screen_args(parser)
+
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
 
-    from .xr_common import _NvidiaEGLContextProvider
-
-    print("[INFO] Crosshair Calibration — OpenXR")
+    mode = "SCREEN (GLFW window)" if args.screen else "OpenXR"
+    print(f"[INFO] Crosshair Calibration — {mode}")
     print("[INFO] Both eyes receive a 2D crosshair pattern.")
     print("[INFO] Calibration offsets and stereo depth are controlled separately.")
 
@@ -393,10 +391,7 @@ def main() -> int:
 
     print(HINT)
 
-    provider = _NvidiaEGLContextProvider()
-    check_openxr()
-
-    from xr.utils.gl import ContextObject
+    sink = make_sink(args)
 
     renderer = CrosshairRenderer(
         offset_left_x=args.offset_left_x,
@@ -411,6 +406,9 @@ def main() -> int:
 
     renderer.clamp_depth()
 
+    if args.screen:
+        renderer._pre_cleared = True
+
     stdin_reader = _StdinReader()
 
     start = time.perf_counter()
@@ -419,21 +417,16 @@ def main() -> int:
     running = True
 
     try:
-        with ContextObject(
-            context_provider=provider,
-            instance_create_info=xr.InstanceCreateInfo(
-                enabled_extension_names=list(_REQUIRED_EXTENSIONS),
-            ),
-        ) as xr_context:
+        with sink as s:
             print("[INFO] Session started.")
             print("[INFO] First calibrate offsets at DEPTH=+0.0px, then adjust depth.")
             _print_state("[OFFSETS]", renderer)
 
-            for _frame_index, frame_state in enumerate(xr_context.frame_loop()):
+            for _frame_index, frame_state in enumerate(s.frame_loop()):
                 if not running:
                     break
 
-                for view_index, _view in enumerate(xr_context.view_loop(frame_state)):
+                for view_index, _view in enumerate(s.view_loop(frame_state)):
                     renderer.render(view_index)
 
                 frames += 1
@@ -456,7 +449,6 @@ def main() -> int:
                 running = _handle_input(stdin_reader, renderer)
 
     finally:
-        provider.destroy()
         stdin_reader.restore()
 
     print("\n[RESULT] Calibration offsets:")

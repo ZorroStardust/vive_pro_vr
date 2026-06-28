@@ -7,6 +7,7 @@ This module is the single source of truth for:
   * non-blocking single-key stdin reader (``_StdinReader``)
   * ``RuntimeComfortState`` dataclass + input handling
   * argparse factories for the shared comfort/calibration CLI surface
+  * ``ScreenSink`` / ``OpenXRSink`` — unified sink interface for HMD vs. screen rendering
 
 Nothing here imports from sibling modules, so it is safe to import from
 ``xr_mujoco_opengl``, ``xr_surgical_robot`` and ``xr_crosshair_calibration``
@@ -21,6 +22,7 @@ import os
 import select
 import sys
 import termios
+import time
 import fcntl
 from dataclasses import dataclass
 
@@ -921,3 +923,264 @@ def add_comfort_args(parser: argparse.ArgumentParser, comfort) -> None:
         action="store_true",
         help="Save calibration and comfort settings to config file on exit.",
     )
+
+
+# ---- Screen / XR sink abstraction ---------------------------------------
+
+
+@dataclass
+class _FrameState:
+    """Thin substitute for xr.FrameState in screen mode."""
+    pass
+
+
+@dataclass
+class _ViewState:
+    """Thin substitute for xr.ViewState in screen mode."""
+    pass
+
+
+def add_screen_args(parser: argparse.ArgumentParser) -> None:
+    """Add ``--screen``, ``--sbs-layout`` and related screen-mode flags.
+
+    Call this in every XR entry point alongside
+    :py:func:`add_calibration_args` and :py:func:`add_comfort_args`.
+    """
+    parser.add_argument(
+        "--screen",
+        action="store_true",
+        help="Render to a desktop window instead of the VR HMD (no Monado or OpenXR required).",
+    )
+    parser.add_argument(
+        "--screen-width",
+        type=int,
+        default=1440,
+        help="Window width in pixels (screen mode only).",
+    )
+    parser.add_argument(
+        "--screen-height",
+        type=int,
+        default=800,
+        help="Window height in pixels (screen mode only).",
+    )
+    parser.add_argument(
+        "--screen-fullscreen",
+        action="store_true",
+        help="Use fullscreen window (screen mode only).",
+    )
+    parser.add_argument(
+        "--screen-monitor",
+        type=int,
+        default=0,
+        help="Monitor index for fullscreen (screen mode only).",
+    )
+    parser.add_argument(
+        "--screen-fps",
+        type=float,
+        default=60.0,
+        help="Target FPS for screen mode.",
+    )
+    parser.add_argument(
+        "--screen-title",
+        default="MuJoCo Stereo — Screen",
+        help="Window title (screen mode only).",
+    )
+    parser.add_argument(
+        "--sbs-layout",
+        choices=("vertical", "horizontal"),
+        default="horizontal",
+        help="Side-by-side layout: horizontal (side-by-side) or vertical (stacked). Default: horizontal.",
+    )
+
+
+class ScreenSink:
+    """GLFW window sink that mimics the OpenXR view/frame loop.
+
+    Used as a drop-in replacement for ``xr.utils.gl.ContextObject`` in
+    screen-debug mode.  Creates a desktop window, splits it into two
+    eye viewports (left/right), and drives the render loop via ``glfw``.
+    """
+
+    def __init__(
+        self,
+        width: int = 1440,
+        height: int = 800,
+        fullscreen: bool = False,
+        monitor: int = 0,
+        fps: float = 60.0,
+        layout: str = "horizontal",
+        title: str = "MuJoCo Stereo — Screen",
+    ):
+        self._width = width
+        self._height = height
+        self._fullscreen = fullscreen
+        self._monitor = monitor
+        self._fps = fps
+        self._layout = layout
+        self._title = title
+        self._window = None
+
+    def __enter__(self):
+        import glfw as _glfw
+
+        if not _glfw.init():
+            raise RuntimeError("GLFW init failed for screen sink")
+
+        os.environ["PYOPENGL_PLATFORM"] = "egl"
+        os.environ["MUJOCO_GL"] = "egl"
+        global _gl_module
+        _gl_module = None
+
+        _glfw.window_hint(_glfw.CLIENT_API, _glfw.OPENGL_API)
+        _glfw.window_hint(_glfw.CONTEXT_VERSION_MAJOR, 3)
+        _glfw.window_hint(_glfw.CONTEXT_VERSION_MINOR, 3)
+        _glfw.window_hint(_glfw.OPENGL_PROFILE, _glfw.OPENGL_COMPAT_PROFILE)
+
+        if self._fullscreen:
+            monitors = _glfw.get_monitors()
+            if self._monitor >= len(monitors):
+                _glfw.terminate()
+                raise RuntimeError(
+                    f"Monitor {self._monitor} not found "
+                    f"(available: 0..{len(monitors) - 1})"
+                )
+            mon = monitors[self._monitor]
+            mode = _glfw.get_video_mode(mon)
+            self._window = _glfw.create_window(
+                mode.size.width, mode.size.height,
+                self._title, mon, None,
+            )
+        else:
+            self._window = _glfw.create_window(
+                self._width, self._height,
+                self._title, None, None,
+            )
+
+        if not self._window:
+            _glfw.terminate()
+            raise RuntimeError("GLFW create_window failed for screen sink")
+
+        _glfw.make_context_current(self._window)
+        _glfw.swap_interval(1)
+
+        GL = _get_gl()
+        while GL.glGetError() != GL.GL_NO_ERROR:
+            pass
+
+        self._glfw = _glfw
+        return self
+
+    def __exit__(self, *exc_info):
+        if self._window is not None:
+            self._glfw.destroy_window(self._window)
+            self._window = None
+        self._glfw.terminate()
+        return False
+
+    def make_current(self) -> None:
+        self._glfw.make_context_current(self._window)
+
+    def frame_loop(self):
+        while not self._glfw.window_should_close(self._window):
+            t0 = time.perf_counter()
+            yield _FrameState()
+            self._glfw.swap_buffers(self._window)
+            self._glfw.poll_events()
+            elapsed = time.perf_counter() - t0
+            sleep_s = max(0.0, 1.0 / self._fps - elapsed)
+            if sleep_s > 0:
+                time.sleep(sleep_s)
+
+    def view_loop(self, frame_state):
+        fbw, fbh = self._glfw.get_framebuffer_size(self._window)
+        GL = _get_gl()
+
+        GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+        GL.glDisable(GL.GL_SCISSOR_TEST)
+        GL.glViewport(0, 0, fbw, fbh)
+        GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
+
+        if self._layout == "vertical":
+            half = fbh // 2
+            views = [
+                (0, half, fbw, fbh - half),
+                (0, 0, fbw, half),
+            ]
+        else:
+            half = fbw // 2
+            views = [
+                (0, 0, half, fbh),
+                (half, 0, fbw - half, fbh),
+            ]
+
+        for _view_index, vp in enumerate(views):
+            x, y, w, h = vp
+            GL.glViewport(x, y, w, h)
+            yield _ViewState()
+
+
+class OpenXRSink:
+    """OpenXR sink wrapping the existing EGL + ContextObject path.
+
+    Provides the same ``frame_loop()`` / ``view_loop()`` API as
+    :py:class:`ScreenSink` so callers can switch between HMD and screen
+    modes transparently.
+    """
+
+    def __init__(self):
+        os.environ["PYOPENGL_PLATFORM"] = "egl"
+        os.environ["MUJOCO_GL"] = "egl"
+
+        global _gl_module
+        _gl_module = None
+
+        check_openxr()
+        self._provider = _NvidiaEGLContextProvider()
+
+        import xr
+
+        from xr.utils.gl import ContextObject
+
+        self._ctx = ContextObject(
+            context_provider=self._provider,
+            instance_create_info=xr.InstanceCreateInfo(
+                enabled_extension_names=list(_REQUIRED_EXTENSIONS),
+            ),
+        )
+
+    def __enter__(self):
+        self._ctx.__enter__()
+        return self
+
+    def __exit__(self, *exc_info):
+        result = self._ctx.__exit__(*exc_info)
+        self._provider.destroy()
+        return result
+
+    def make_current(self) -> None:
+        self._provider.make_current()
+
+    def frame_loop(self):
+        return self._ctx.frame_loop()
+
+    def view_loop(self, frame_state):
+        return self._ctx.view_loop(frame_state)
+
+
+def make_sink(args) -> ScreenSink | OpenXRSink:
+    """Create the appropriate stereo sink based on CLI args.
+
+    When ``args.screen`` is true returns a :py:class:`ScreenSink`;
+    otherwise returns an :py:class:`OpenXRSink`.
+    """
+    if args.screen:
+        return ScreenSink(
+            width=args.screen_width,
+            height=args.screen_height,
+            fullscreen=args.screen_fullscreen,
+            monitor=args.screen_monitor,
+            fps=args.screen_fps,
+            layout=args.sbs_layout,
+            title=args.screen_title,
+        )
+    return OpenXRSink()

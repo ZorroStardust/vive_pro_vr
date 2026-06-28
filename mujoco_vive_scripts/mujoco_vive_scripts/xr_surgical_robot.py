@@ -7,24 +7,21 @@ import threading
 import time
 from pathlib import Path
 
-os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
-os.environ.setdefault("MUJOCO_GL", "egl")
-
 import mujoco as mj
-import xr
 
 from .xr_common import (
     HINT,
     RuntimeComfortState,
-    _NvidiaEGLContextProvider,
-    _REQUIRED_EXTENSIONS,
+    OpenXRSink,
+    ScreenSink,
     _StdinReader,
     _drain_gl_errors,
     _handle_input,
     _print_comfort_state,
     add_calibration_args,
     add_comfort_args,
-    check_openxr,
+    add_screen_args,
+    make_sink,
 )
 from .xr_mujoco_opengl import MujocoStereoRenderer
 from .config_util import (
@@ -152,36 +149,14 @@ def render_loop(
     print_every: float = 2.0,
     print_diagnostics: bool = True,
     clutch_callback=None,
+    sink: OpenXRSink | ScreenSink | None = None,
 ) -> None:
-    """Run OpenXR stereo rendering loop on a shared MuJoCo model+data.
+    """Run stereo rendering loop on a shared MuJoCo model+data.
 
-    This function blocks until the user quits (q/Esc) or *stop_event* is set.
-    It only reads *model* / *data* and never writes to them, so an external
-    simulation thread can drive physics concurrently through *scene_lock*.
-
-    Parameters
-    ----------
-    model, data:
-        The MuJoCo model and data owned by the caller.  These are read by
-        ``mjv_updateScene`` / ``mjr_render`` but never mutated.
-    left_camera, right_camera:
-        Names of the fixed cameras to use for the left / right eye.
-    comfort_state:
-        Existing ``RuntimeComfortState`` instance; one is created from the
-        config file if ``None``.
-    stop_event:
-        When set the render loop will exit cleanly at the next frame boundary.
-    scene_lock:
-        Shared lock used by the caller's simulation thread.  The render loop
-        acquires it briefly during every ``render_eye`` call.
-    calibr_*:
-        Per-eye calibration offsets in pixels (overrides config file).
-    clear_rgb:
-        Background clear colour.
-    print_every:
-        Seconds between FPS / state diagnostic prints.
-    print_diagnostics:
-        Print camera diagnostic info at startup.
+    Accepts an optional *sink* (``OpenXRSink`` or ``ScreenSink``).  When
+    ``None`` the default OpenXR (EGL → HMD) path is used for backward
+    compatibility.  Pass a ``ScreenSink`` from ``make_sink(args)`` for
+    desktop-window debugging.
     """
     if comfort_state is None:
         comfort = load_comfort() or ComfortConfig()
@@ -207,10 +182,10 @@ def render_loop(
     print(HINT)
     _print_comfort_state("[COMFORT]", comfort_state)
 
-    provider = _NvidiaEGLContextProvider()
-    check_openxr()
-
-    from xr.utils.gl import ContextObject
+    _owns_sink = False
+    if sink is None:
+        sink = OpenXRSink()
+        _owns_sink = True
 
     renderer = None
     stdin_reader = _StdinReader()
@@ -220,13 +195,8 @@ def render_loop(
     running = True
 
     try:
-        with ContextObject(
-            context_provider=provider,
-            instance_create_info=xr.InstanceCreateInfo(
-                enabled_extension_names=list(_REQUIRED_EXTENSIONS),
-            ),
-        ) as xr_context:
-            provider.make_current()
+        with sink as s:
+            s.make_current()
             _drain_gl_errors("before SurgicalStereoRenderer.create")
 
             renderer = SurgicalStereoRenderer.create(
@@ -242,6 +212,9 @@ def render_loop(
             )
             _drain_gl_errors("after SurgicalStereoRenderer.create")
 
+            if isinstance(sink, ScreenSink):
+                renderer._pre_cleared = True
+
             if print_diagnostics and scene_lock is not None:
                 mj.mj_forward(model, data)
                 for cam_name in (left_camera, right_camera):
@@ -252,11 +225,11 @@ def render_loop(
                     print(f"[INFO] {cam_name}: pos={cam_pos} zaxis={cam_z}")
                 print(f"[INFO] Scene geoms: {renderer.scene.ngeom}")
 
-            for _frame_index, frame_state in enumerate(xr_context.frame_loop()):
+            for _frame_index, frame_state in enumerate(s.frame_loop()):
                 if not running or stop_event.is_set():
                     break
 
-                for view_index, _view in enumerate(xr_context.view_loop(frame_state)):
+                for view_index, _view in enumerate(s.view_loop(frame_state)):
                     with scene_lock:
                         renderer.render_eye(view_index, comfort_state)
 
@@ -287,7 +260,6 @@ def render_loop(
         stdin_reader.restore()
         if renderer is not None:
             renderer.close()
-        provider.destroy()
         print("\n[RESULT] Final state:")
         _print_comfort_state(" ", comfort_state)
 
@@ -311,6 +283,7 @@ def parse_args() -> argparse.Namespace:
 
     add_calibration_args(parser, calib)
     add_comfort_args(parser, comfort)
+    add_screen_args(parser)
 
     return parser.parse_args()
 
@@ -318,7 +291,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
-    print("[INFO] Surgical Robot — OpenXR Stereo preview (standalone)")
+    mode = "SCREEN (GLFW window)" if args.screen else "OpenXR Stereo"
+    print(f"[INFO] Surgical Robot — {mode} preview (standalone)")
     print("[INFO] Model:", args.model)
     print("[INFO] Cameras:", args.left_camera, "/", args.right_camera)
 
@@ -395,6 +369,7 @@ def main() -> int:
         calibr_right_y=args.calib_right_y,
         clear_rgb=tuple(args.clear_rgb),
         print_every=args.print_every,
+        sink=make_sink(args),
     )
 
     if args.save:
