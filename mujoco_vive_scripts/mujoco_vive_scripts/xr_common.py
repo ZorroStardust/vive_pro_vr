@@ -993,6 +993,33 @@ def add_screen_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_vr_window_args(parser: argparse.ArgumentParser) -> None:
+    """Add ``--vr-window`` and related virtual-screen-in-HMD flags.
+
+    When ``--vr-window`` is active, stereo views are rendered to a
+    floating virtual rectangle inside the HMD instead of filling the
+    entire display per eye.  Call this alongside :py:func:`add_comfort_args`
+    in OpenXR entry points.
+    """
+    parser.add_argument(
+        "--vr-window",
+        action="store_true",
+        help="Show stereo views on a floating virtual screen in VR instead of filling the HMD.",
+    )
+    parser.add_argument(
+        "--vr-window-size",
+        type=float,
+        default=0.7,
+        help="Virtual screen size relative to the HMD viewport (0.1–1.0).  Default: 0.7.",
+    )
+    parser.add_argument(
+        "--vr-window-distance",
+        type=float,
+        default=1.5,
+        help="Perceived distance of the virtual screen in metres.  Default: 1.5.",
+    )
+
+
 class ScreenSink:
     """GLFW window sink that mimics the OpenXR view/frame loop.
 

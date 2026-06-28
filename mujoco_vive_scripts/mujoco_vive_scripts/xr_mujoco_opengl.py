@@ -35,6 +35,7 @@ from .xr_common import (
     add_calibration_args,
     add_comfort_args,
     add_screen_args,
+    add_vr_window_args,
     make_sink,
 )
 from .config_util import (
@@ -219,9 +220,58 @@ class MujocoStereoRenderer:
 
     _pre_cleared: bool = False
 
-    def begin_frame(self) -> None:
-        """Call once per frame before the eye loop starts."""
-        pass
+    # -- VR virtual‑screen mode -------------------------------------------
+    _vr_window: bool = False
+    _vr_window_size: float = 0.7
+    _vr_window_distance: float = 1.5
+    _vr_fbo_left: _MonoFBOBlitter | None = None
+    _vr_fbo_right: _MonoFBOBlitter | None = None
+
+    def begin_frame(self, comfort_state: RuntimeComfortState | None = None) -> None:
+        """Call once per frame before the eye loop starts.
+
+        In VR‑window mode this renders both MuJoCo views to dedicated
+        off‑screen FBOs so ``render_eye`` only needs to blit a textured
+        quad.
+        """
+        if not self._vr_window:
+            return
+
+        zoom = comfort_state.zoom if comfort_state is not None else 1.0
+
+        GL = _get_gl()
+
+        vp = GL.glGetIntegerv(GL.GL_VIEWPORT)
+        vp_w, vp_h = int(vp[2]), int(vp[3])
+
+        if self._vr_fbo_left is None:
+            self._vr_fbo_left = _MonoFBOBlitter()
+        if self._vr_fbo_right is None:
+            self._vr_fbo_right = _MonoFBOBlitter()
+
+        for cam_id, fbo in [(self.left_id, self._vr_fbo_left), (self.right_id, self._vr_fbo_right)]:
+            fbo.ensure(vp_w, vp_h, GL)
+            fbo.bind_for_render(GL)
+
+            self.camera.type = mujoco.mjtCamera.mjCAMERA_FIXED
+            self.camera.fixedcamid = cam_id
+            original_fovy = float(self.model.cam_fovy[cam_id])
+            self.model.cam_fovy[cam_id] = original_fovy / max(zoom, 0.1)
+
+            mujoco.mjv_updateScene(
+                self.model, self.data, self.option, None,
+                self.camera, mujoco.mjtCatBit.mjCAT_ALL, self.scene,
+            )
+            self.model.cam_fovy[cam_id] = original_fovy
+
+            GL.glEnable(GL.GL_DEPTH_TEST)
+            GL.glClearColor(self.clear_r, self.clear_g, self.clear_b, 1.0)
+            GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
+
+            mujoco.mjr_render(mujoco.MjrRect(0, 0, vp_w, vp_h), self.scene, self.context)
+            _drain_gl_errors(f"after vr-window mjr_render cam={cam_id}", print_limit=2)
+
+            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
 
     @classmethod
     def create(
@@ -352,6 +402,32 @@ class MujocoStereoRenderer:
         """
         GL = _get_gl()
         timing_t0 = time.perf_counter()
+
+        if self._vr_window:
+            fbo = self._vr_fbo_left if view_index == 0 else self._vr_fbo_right
+            if fbo is None:
+                return
+
+            vp_x, vp_y, vp_w, vp_h = self._viewport_for(view_index, GL)
+            calib_x, calib_y = self._calib_for_eye(view_index)
+            comfort_x = self._comfort_shift_for_eye(view_index, state)
+
+            GL.glDisable(GL.GL_DEPTH_TEST)
+            GL.glViewport(vp_x, vp_y, vp_w, vp_h)
+
+            GL.glClearColor(self.clear_r, self.clear_g, self.clear_b, 1.0)
+            GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+
+            size = max(0.1, min(1.0, self._vr_window_size))
+            dst_w = int(round(vp_w * size))
+            dst_h = int(round(vp_h * size * vp_h / vp_w)) if vp_w else dst_w
+            margin_x = (vp_w - dst_w) // 2 + int(round(calib_x + comfort_x))
+            margin_y = (vp_h - dst_h) // 2 + int(round(calib_y))
+
+            fbo.blit_to(GL, vp_x + margin_x, vp_y + margin_y, dst_w, dst_h)
+
+            self.timings.add(update_scene=0.0, mjr_render=0.0, other=time.perf_counter() - timing_t0)
+            return
 
         use_mono_fast = bool(state.mono_fast and state.mono_to_both_eyes)
 
@@ -504,6 +580,7 @@ def parse_args() -> argparse.Namespace:
     add_calibration_args(parser, calib)
     add_comfort_args(parser, comfort)
     add_screen_args(parser)
+    add_vr_window_args(parser)
 
     return parser.parse_args()
 
@@ -627,6 +704,11 @@ def main() -> int:
             if args.screen and renderer is not None:
                 renderer._pre_cleared = True
 
+            if args.vr_window and renderer is not None:
+                renderer._vr_window = True
+                renderer._vr_window_size = args.vr_window_size
+                renderer._vr_window_distance = args.vr_window_distance
+
             try:
                 for frame_state in s.frame_loop():
                     if not running:
@@ -636,7 +718,7 @@ def main() -> int:
                     t = t_frame_start - start
 
                     if renderer is not None:
-                        renderer.begin_frame()
+                        renderer.begin_frame(comfort_state)
                         t_step_start = time.perf_counter()
                         renderer.step(
                             t,

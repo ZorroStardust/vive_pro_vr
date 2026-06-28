@@ -21,6 +21,7 @@ from .xr_common import (
     add_calibration_args,
     add_comfort_args,
     add_screen_args,
+    add_vr_window_args,
     make_sink,
 )
 from .xr_mujoco_opengl import MujocoStereoRenderer
@@ -150,6 +151,9 @@ def render_loop(
     print_diagnostics: bool = True,
     clutch_callback=None,
     sink: OpenXRSink | ScreenSink | None = None,
+    vr_window: bool = False,
+    vr_window_size: float = 0.7,
+    vr_window_distance: float = 1.5,
 ) -> None:
     """Run stereo rendering loop on a shared MuJoCo model+data.
 
@@ -215,6 +219,11 @@ def render_loop(
             if isinstance(sink, ScreenSink):
                 renderer._pre_cleared = True
 
+            if vr_window:
+                renderer._vr_window = True
+                renderer._vr_window_size = vr_window_size
+                renderer._vr_window_distance = vr_window_distance
+
             if print_diagnostics and scene_lock is not None:
                 mj.mj_forward(model, data)
                 for cam_name in (left_camera, right_camera):
@@ -228,6 +237,8 @@ def render_loop(
             for _frame_index, frame_state in enumerate(s.frame_loop()):
                 if not running or stop_event.is_set():
                     break
+
+                renderer.begin_frame(comfort_state)
 
                 for view_index, _view in enumerate(s.view_loop(frame_state)):
                     with scene_lock:
@@ -284,6 +295,7 @@ def parse_args() -> argparse.Namespace:
     add_calibration_args(parser, calib)
     add_comfort_args(parser, comfort)
     add_screen_args(parser)
+    add_vr_window_args(parser)
 
     return parser.parse_args()
 
@@ -370,6 +382,9 @@ def main() -> int:
         clear_rgb=tuple(args.clear_rgb),
         print_every=args.print_every,
         sink=make_sink(args),
+        vr_window=args.vr_window,
+        vr_window_size=args.vr_window_size,
+        vr_window_distance=args.vr_window_distance,
     )
 
     if args.save:
