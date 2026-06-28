@@ -226,14 +226,15 @@ def render_loop(
                 renderer._vr_window_distance = vr_window_distance
 
             if print_diagnostics and scene_lock is not None:
-                mj.mj_forward(model, data)
-                for cam_name in (left_camera, right_camera):
-                    cam_id = mj.mj_name2id(model, mj.mjtObj.mjOBJ_CAMERA, cam_name)
-                    cam_pos = data.cam_xpos[cam_id]
-                    cam_mat = data.cam_xmat[cam_id].reshape(3, 3)
-                    cam_z = cam_mat[:, 2]
-                    print(f"[INFO] {cam_name}: pos={cam_pos} zaxis={cam_z}")
-                print(f"[INFO] Scene geoms: {renderer.scene.ngeom}")
+                with scene_lock:
+                    mj.mj_forward(model, data)
+                    for cam_name in (left_camera, right_camera):
+                        cam_id = mj.mj_name2id(model, mj.mjtObj.mjOBJ_CAMERA, cam_name)
+                        cam_pos = data.cam_xpos[cam_id]
+                        cam_mat = data.cam_xmat[cam_id].reshape(3, 3)
+                        cam_z = cam_mat[:, 2]
+                        print(f"[INFO] {cam_name}: pos={cam_pos} zaxis={cam_z}")
+                    print(f"[INFO] Scene geoms: {renderer.scene.ngeom}")
 
             for _frame_index, frame_state in enumerate(s.frame_loop()):
                 if not running or stop_event.is_set():
