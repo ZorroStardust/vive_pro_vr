@@ -33,7 +33,11 @@ pixi run install-system-deps
 | Offscreen stereo render | `pixi run save-frames` (outputs `out/left.png right.png sbs.png`) |
 | SBS windowed | `pixi run sbs-windowed` |
 | SBS fullscreen on monitor N | `MONITOR=N pixi run sbs-fullscreen` |
-| Start Monado (Wayland windowed) | `pixi run start-monado` |
+| Start Monado (Wayland windowed, **attached to this terminal**) | `pixi run start-monado` |
+| Start Monado **detached** (`setsid` + PTY, Ctrl+C-safe, recommended) | `pixi run monado-detached` |
+| Stop detached Monado (SIGINT → 10s wait → SIGTERM → 5s wait → SIGKILL) | `pixi run monado-stop` |
+| Show detached Monado status + IPC + log tail | `pixi run monado-status` |
+| Try to restart crashed KDE :1 Xwayland (DBus reconfigure) | `pixi run kde-recover` |
 | Test hello_xr against Monado | `pixi run test-openxr` |
 | OpenXR env check | `pixi run openxr-check` |
 | OpenXR pink world (left/right pure color) | `pixi run xr-pink-world` |
@@ -55,7 +59,9 @@ pixi run install-system-deps
 ## Monado specifics
 
 - VIVE Vulkan display index is **2**: `XRT_COMPOSITOR_FORCE_VK_DISPLAY=2`.
-- Monado **must have a PTY** for stdin epoll. Use tmux, **never** bare `monado-service &`.
+- Monado **must have a PTY** for stdin epoll (`init_epoll`). `/dev/null` works
+  intermittently; `script -qfc` with a self-opening FIFO (R+W) is the reliable
+  approach — used by `start_monado_detached.sh`.
 - IPC socket: `/run/user/$(id -u)/monado_comp_ipc`. Delete stale sockets on failure.
 - **Base stations and controllers must be OFF** during display-only testing. When on, Lighthouse pulse reports can overflow Monado's buffer.
 - Always check for `1 active app session(s)` in Monado log to confirm client connection succeeded.
@@ -64,6 +70,81 @@ pixi run install-system-deps
 
 - Never `pkill -f hello_xr` — it matches the script filename and kills the script. Use `pkill -x hello_xr`.
 - Never `sudo` OpenXR clients — the IPC socket is per-user under `/run/user/$UID/`.
+- **Monado needs a PTY for stdin**: `monado-service` calls `epoll_ctl(STDIN_FILENO, ...)` inside
+  its main loop (init_epoll).  Without a valid epoll-able fd, monado exits immediately with
+  "init_epoll failed".  `/dev/null` is unreliable as stdin (succeeds only intermittently).
+  **`start_monado_detached.sh` uses `script -qfc` to create a PTY, fed by a self-opening FIFO
+  (R+W) to keep it alive forever.**  This is the only approach that works reliably.
+- **Ctrl+C chain**: when monado runs in a detached session (`setsid`), Ctrl+C in the
+  launching terminal does NOT propagate to monado.  xr-pink-world Ctrl+C only kills the
+  client; monado stays alive.
+- **VIVE Pro & DRM master**: the VIVE requires KWin's DRM master (exclusive kernel-mode lock).
+  Private Xwayland (Plan C2) cannot work — the VIVE is exposed via `wp_drm_lease_device_v1`
+  only, and monado's compositor list does not include DRM lease acquisition.
+  `start_xwayland_99.sh` is kept in tree for reference but not used by default.
+- **`pixi run kde-recover`** tries to revive a crashed KDE `:1` Xwayland via
+  `gdbus org.kde.KWin reconfigure`; if that fails it prints manual recovery
+  steps (TTY + `kwin_wayland --replace`, logout/login, or reboot).
+
+## Known issue: VIVE DP-3 stays disabled after monado exits
+
+**Symptom**: `pixi run monado-detached` starts monado but the VIVE green
+light never turns on.  `monado-status` shows `IPC: MISSING`, log ends at
+`compositor_check_and_prepare_xdev`, and `/sys/class/drm/card1-DP-3/enabled`
+reads `disabled`.
+
+**Cause**: NVIDIA proprietary driver (580.x) does not properly release the
+VIVE Pro DisplayPort after monado exits via SIGINT/SIGTERM.  The kernel
+keeps DP-3 in "disabled" state, and the next `vkAcquireXlibDisplayEXT` call
+hangs indefinitely inside monado's compositor init.
+
+**Workaround**: **Reboot the system.**  The first monado run after a fresh boot
+always works (verified FPS 90.0).  Subsequent runs fail until reboot.
+
+**Check**: `cat /sys/class/drm/card1-DP-3/enabled`.  If `disabled` and you
+haven't rebooted since the last successful monado run → you have hit this bug.
+
+**Future fix**: either a newer NVIDIA driver that properly releases
+DisplayPort resources, or a kernel patch, or monado calling
+`vkReleaseDisplayEXT` before exit.
+
+## Known issue: Xwayland crashes on monado-stop
+
+**Symptom**: `pixi run monado-stop` works (monado exits) but the KDE session
+shows "Xwayland has crashed" notification and VSCode may briefly
+flash / disconnect.
+
+**Cause**: monado's teardown — closing its libxcb connection to KDE's `:1`
+Xwayland — races with Xwayland's Wayland event loop and causes a segfault
+(`wl_display_dispatch_queue_pending` → signal 11).
+
+**Mitigation in place**:
+1. `~/.config/kwinrc`: `XwaylandCrashPolicy=1` (Restart).  KWin
+   automatically restarts :1 after a crash.
+2. `pixi run monado-stop` now **automatically detects the crash and
+   triggers KWin recovery** (DBus `org.kde.KWin.reconfigure`), polling
+   up to 15s for :1 to come back.
+3. `pixi run kde-recover` can be run manually if auto-recovery doesn't
+   catch it.
+
+## KDE Xwayland crash policy
+
+Default behaviour of KDE Plasma when Xwayland crashes:
+
+- `XwaylandCrashPolicy=Stop` (0): stop the whole session — **avoid**.
+- `XwaylandCrashPolicy=Restart` (1): restart only Xwayland — **recommended**.
+  This is the KDE default, but it can be overridden.
+
+Current setting in `~/.config/kwinrc`:
+
+```ini
+[Xwayland]
+Scale=1.5
+XwaylandCrashPolicy=1   # Restart (KDE default); belt-and-braces against monado crashes
+```
+
+With the detached-session approach, KDE's `:1` is still used by monado
+directly — the isolation comes from `setsid`, not from a separate X server.
 
 ## MuJoCo rendering notes
 

@@ -33,3 +33,20 @@ xr-mujoco-opengl-screen = { cmd = "bash scripts/run_xr_mujoco_opengl_screen.sh",
 xr-surgical-screen = { cmd = "bash scripts/run_xr_surgical_screen.sh", cwd = "mujoco_vive_scripts" }
 xr-crosshair-screen = { cmd = "bash scripts/run_xr_crosshair_screen.sh", cwd = "mujoco_vive_scripts" }
 xr-pink-world-screen = { cmd = "bash scripts/run_xr_pink_world_screen.sh", cwd = "mujoco_vive_scripts" }
+
+# Detached monado-service (Plan A: setsid + /dev/null + pidfile).
+# monado runs in a new session, immune to Ctrl+C.  stdin=/dev/null is
+# fine for monado's init_epoll (verified after clean system reboot).
+#
+# Plan C2 (private Xwayland :99) was tried and abandoned — VIVE Pro
+# requires KWin's DRM master which can't be shared.
+# XwaylandCrashPolicy=Restart in ~/.config/kwinrc handles recovery.
+#
+#   pixi run monado-detached   # start; prints PID
+#   pixi run monado-stop       # SIGINT -> 10s wait -> SIGTERM -> 5s wait -> SIGKILL
+#   pixi run monado-status     # PID, DISPLAY, IPC, log tail
+#   pixi run kde-recover       # try to restart KDE's :1 Xwayland
+monado-detached = { cmd = "bash scripts/start_monado_detached.sh", cwd = "mujoco_vive_scripts" }
+monado-stop     = { cmd = "bash scripts/stop_monado.sh",         cwd = "mujoco_vive_scripts" }
+monado-status   = { cmd = "bash scripts/status_monado.sh",       cwd = "mujoco_vive_scripts" }
+kde-recover     = { cmd = "bash scripts/kde_recover.sh",         cwd = "mujoco_vive_scripts" }
