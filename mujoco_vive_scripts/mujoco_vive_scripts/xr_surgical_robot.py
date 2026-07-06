@@ -75,10 +75,17 @@ class SurgicalStereoRenderer(MujocoStereoRenderer):
         calib_right_x: int = 0,
         calib_right_y: int = 0,
         clear_rgb: tuple[float, float, float] = (0.02, 0.02, 0.02),
+        show_mocap: bool = True,
     ):
         left_id, right_id = cls._resolve_cameras(model, left_camera, right_camera)
 
         option = mj.MjvOption()
+        # Default geomgroup [1,1,1,0,0,0] — groups 0-2 only (no collision, no mocap).
+        # Default sitegroup [1,1,1,0,0,0] — sites visible.
+        if show_mocap:
+            option.geomgroup[4] = 1  # show mocap marker geoms
+        else:
+            option.sitegroup[:] = 0  # hide ik_target_site etc.
 
         _drain_gl_errors("before MjrContext (surgical)")
         context = mj.MjrContext(model, mj.mjtFontScale.mjFONTSCALE_150)
@@ -206,6 +213,7 @@ def render_loop(
     vr_window: bool = False,
     vr_window_size: float = 0.7,
     vr_window_distance: float = 1.5,
+    show_mocap: bool = True,
 ) -> None:
     """Run stereo rendering loop on a shared MuJoCo model+data.
 
@@ -266,6 +274,7 @@ def render_loop(
                 calib_right_x=calibr_right_x,
                 calib_right_y=calibr_right_y,
                 clear_rgb=clear_rgb,
+                show_mocap=show_mocap,
             )
             _drain_gl_errors("after SurgicalStereoRenderer.create")
 
