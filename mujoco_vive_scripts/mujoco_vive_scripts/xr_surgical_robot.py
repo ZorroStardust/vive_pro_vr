@@ -122,15 +122,66 @@ class SurgicalSimLoop:
         self.stepper = MujocoStepper()
 
     def run(self, stop_event: threading.Event) -> None:
+        data = self.scene.data
+        last_report = time.perf_counter()
+        phys_accum = 0.0
+        cycles = 0
+        prev_sim = data.time
+        prev_wall = time.perf_counter()
+        chunk = max(1, int(self.config.render_lock_chunk))
         while not stop_event.is_set():
+            cycle_compute = 0.0
             with self.scene_lock:
+                _t = time.perf_counter()
                 position_goal, _, rotation_goal = self.scene.target_pose_in_base()
                 self.controller.step(position_goal, rotation_goal, 0.0)
-                self.stepper.step(
-                    self.scene.model,
-                    self.scene.data,
-                    self.config.decimation,
+                cycle_compute += time.perf_counter() - _t
+
+            # Advance physics in blocks, releasing scene_lock between blocks
+            # so the VR render loop can acquire it promptly (fairness).
+            # ``data.ctrl`` is constant across the control period, so
+            # decimation mj_step == N blocks of chunk mj_step (identical).
+            remaining = self.config.decimation
+            while remaining > 0 and not stop_event.is_set():
+                n = min(chunk, remaining)
+                with self.scene_lock:
+                    _t = time.perf_counter()
+                    self.stepper.step(
+                        self.scene.model,
+                        self.scene.data,
+                        n,
+                    )
+                    cycle_compute += time.perf_counter() - _t
+                remaining -= n
+                if remaining > 0:
+                    time.sleep(0)
+
+            phys_accum += cycle_compute
+            cycles += 1
+
+            now = time.perf_counter()
+            if now - last_report >= 2.0:
+                wall_dt = now - prev_wall
+                sim_dt = data.time - prev_sim
+                realtime = (
+                    sim_dt / wall_dt * 100.0
+                    if (wall_dt > 0.0 and sim_dt >= 0.0)
+                    else 0.0
                 )
+                t_phys_ms = phys_accum / max(cycles, 1) * 1000.0
+                print(
+                    f"[SIM] T_phys={t_phys_ms:5.2f}ms/cycle  "
+                    f"realtime={realtime:5.1f}%  "
+                    f"control_period={self.config.control_period * 1000.0:.1f}ms  "
+                    f"decimation={self.config.decimation}",
+                    flush=True,
+                )
+                phys_accum = 0.0
+                cycles = 0
+                prev_sim = data.time
+                prev_wall = now
+                last_report = now
+
             stop_event.wait(self.config.control_period)
 
 
@@ -197,6 +248,7 @@ def render_loop(
     start = time.perf_counter()
     last = start
     frames = 0
+    lock_wait_accum = 0.0
     running = True
 
     try:
@@ -243,20 +295,30 @@ def render_loop(
                 renderer.begin_frame(comfort_state)
 
                 for view_index, _view in enumerate(s.view_loop(frame_state)):
+                    _t_before = time.perf_counter()
                     with scene_lock:
+                        lock_wait_accum += time.perf_counter() - _t_before
                         renderer.render_eye(view_index, comfort_state)
 
                 frames += 1
                 now = time.perf_counter()
                 if now - last >= print_every:
                     dt = now - last
+                    avg = renderer.timings.avg_ms()
+                    lock_wait_ms = lock_wait_accum / max(frames, 1) * 1000.0
                     print(
-                        f"[INFO] FPS: {frames / dt:.1f}  "
+                        f"[INFO] FPS: {frames / dt:5.1f}  "
+                        f"UPD={avg['update_scene'] * 2:5.2f}ms  "
+                        f"REN={avg['mjr_render'] * 2:5.2f}ms  "
+                        f"OTH={avg['other'] * 2:5.2f}ms  "
+                        f"LOCKWAIT={lock_wait_ms:5.2f}ms/frame  "
                         f"ZOOM={comfort_state.zoom:.2f}  "
                         f"SCENE_FARTHER={comfort_state.scene_farther_px:+.1f}px  "
                         f"MONO={'on' if comfort_state.mono_to_both_eyes else 'off'}  "
                         f"SWAP={'on' if comfort_state.swap_eyes else 'off'}"
                     )
+                    renderer.timings.reset()
+                    lock_wait_accum = 0.0
                     frames = 0
                     last = now
 
