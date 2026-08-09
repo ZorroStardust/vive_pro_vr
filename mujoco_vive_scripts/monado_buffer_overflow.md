@@ -41,6 +41,26 @@
   正常连接（版本串 `GIT-NOTFOUND` 与发行版客户端库精确匹配后无
   IPC 版本冲突）。修复前同状态必然在收到脉冲报告时 SIGABRT。
 
+### 部署细节（源码 / 二进制 / 执行优先级）
+
+- **源码**：`~/monado-build/` —— 官方源包
+  `monado_21.0.0+git2905.e26a272c1~dfsg1.orig.tar.xz` 解压而成，与发行版
+  `-2build2` 完全同源。两处本地修改：`src/xrt/drivers/vive/vive_device.c`
+  （溢出补丁）与 `CMakeLists.txt`（`set(GIT_DESC "GIT-NOTFOUND")`）。
+- **编译产物**：`~/monado-build/build/src/xrt/targets/service/monado-service`
+  （1.1MB Release）。
+- **安装**：`sudo install -m755` 复制到 `/usr/local/bin/monado-service`；
+  `/usr/bin/monado-service`（2.3MB 原版，仍带 bug）保持不动。
+- **执行优先级 = PATH 目录顺序**（非别名/非 symlink）：
+  - PATH 中 `/usr/local/bin` 排在 `/usr/bin` 之前，shell 按序取第一个匹配：
+    `which -a monado-service` → `/usr/local/bin/...`（生效）→ `/usr/bin/...`（被遮蔽）→ `/bin/...`（软链到 /usr/bin）。
+  - 客户端库 `libopenxr_monado.so` 用 `os_find_system_command("monado-service")`
+    沿 PATH 找进程名，所有 OpenXR 客户端自动连接到修复版。
+  - `apt` 永不写 `/usr/local/bin`，发行版升级不会覆盖修复版；
+    回退只需删除 `/usr/local/bin/monado-service`。
+- **注意**：systemd user unit（`/usr/lib/systemd/user/monado.service`）的
+  `ExecStart` 用绝对路径会绕开修复版；本项目 pixi 脚本均经 PATH 查找，不受影响。
+
 ## 时间线
 
 1. `xr-live-video` 会话运行数分钟后，monado 日志先出现大量
