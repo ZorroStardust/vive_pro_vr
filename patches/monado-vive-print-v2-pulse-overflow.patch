@@ -1,0 +1,23 @@
+--- a/src/xrt/drivers/vive/vive_device.c
++++ b/src/xrt/drivers/vive/vive_device.c
+@@ -635,17 +635,15 @@
+ _print_v2_pulse(
+     struct vive_device *d, uint8_t sensor_id, uint8_t flag, uint32_t timestamp, uint32_t data, uint32_t mask)
+ {
+-	char data_str[32];
++	char data_str[33];
+ 
+ 	for (int k = 0; k < 32; k++) {
+ 		uint8_t idx = 32 - k - 1;
+ 		bool d = (data >> (idx)) & 1u;
+ 		bool m = (mask >> (idx)) & 1u;
+-		if (m)
+-			sprintf(&data_str[k], "%d", d);
+-		else
+-			sprintf(&data_str[k], "_");
++		data_str[k] = m ? (char)('0' + d) : '_';
+ 	}
++	data_str[32] = '\0';
+ 
+ 	VIVE_TRACE(d,
+ 	           "[sensor %02d] flag: %03u "

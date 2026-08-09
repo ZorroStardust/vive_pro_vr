@@ -101,6 +101,38 @@ hangs indefinitely inside monado's compositor init.
 **Workaround**: **Reboot the system.**  The first monado run after a fresh boot
 always works (verified FPS 90.0).  Subsequent runs fail until reboot.
 
+## Known issue: monado "buffer overflow detected" crash (VIVE sensor state)
+
+**Symptom**: monado aborts with `*** buffer overflow detected ***: terminated`
+(SIGABRT) — either at startup right after `vive_device_create` logs, or
+mid-session.  Often preceded by garbage IMU ranges in the log
+(`Gyroscope: 177 / Accelerometer: 112`, valid range is 0–4) and
+`Firmware version 0`.
+
+**Cause**: two independent problems, see
+`mujoco_vive_scripts/monado_buffer_overflow.md` for the full analysis:
+1. The VIVE Pro sensor MCU returned garbage reports (bad firmware state).
+2. monado's `_print_v2_pulse()` (vive driver) has a real 1-byte stack
+   overflow: `sprintf(&data_str[31], "_")` at the last loop iteration.
+   **Any 59-byte `VIVE_HEADSET_LIGHTHOUSE_V2_PULSE_REPORT_ID` report kills
+   monado deterministically** — this is the real code behind the old
+   "keep base stations OFF" rule.  Still unfixed upstream.
+
+**STATUS: FIXED LOCALLY** (2026-08-09).  A patched `monado-service`
+(21.0.0+git2905.e26a272c1~dfsg1-2build2) is installed at
+`/usr/local/bin/monado-service` and shadows the distro binary via PATH.
+Patch: `patches/monado-vive-print-v2-pulse-overflow.patch`.
+Source + rebuild instructions: `~/monado-build` (CMake; the embedded
+version string must be exactly `GIT-NOTFOUND` to match the distro client
+lib — see the `set(GIT_DESC "GIT-NOTFOUND")` override in the local
+CMakeLists.txt; `-DGIT_DESC` won't work since CMake treats any value
+ending in `-NOTFOUND` as false, and `IPC_IGNORE_VERSION=1` is the
+fallback for clients).
+
+**Workaround** (still applies to the *hardware* side): power-cycle the VIVE
+(unplug Link Box USB/power for ~10s, re-enumerates the sensor MCU).  Keep
+base stations and controllers OFF.
+
 **Check**: `cat /sys/class/drm/card1-DP-3/enabled`.  If `disabled` and you
 haven't rebooted since the last successful monado run → you have hit this bug.
 
