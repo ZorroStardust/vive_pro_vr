@@ -149,11 +149,26 @@ DisplayPort resources, or a kernel patch, or monado calling
 shows "Xwayland has crashed" notification and VSCode may briefly
 flash / disconnect.
 
-**Cause**: monado's teardown — closing its libxcb connection to KDE's `:1`
-Xwayland — races with Xwayland's Wayland event loop and causes a segfault
-(`wl_display_dispatch_queue_pending` → signal 11).
+**Cause**: NOT a race in monado — it is a **use-after-free inside Xwayland**
+(`hw/xwayland/xwayland-drm-lease.c`).  monado's teardown releases the VIVE's
+DRM lease; Xwayland's `wp_drm_lease_connector_v1.withdrawn` handler frees the
+`xwl_output` while it is still referenced by `rrLease->outputs[]`, then the
+`wp_drm_lease_v1.finished` handler walks the dangling pointer and SEGVs.
+Full evidence chain (apport core + disassembly + source match) and fix
+record: `mujoco_vive_scripts/xwayland_crash_analysis.md`.
 
-**Mitigation in place**:
+**STATUS: FIXED LOCALLY** (2026-08-10).  A rebuilt `xwayland`
+(23.2.6-1ubuntu0.8, dpkg-installed) backports upstream commits `f6cd168d`
+("Do not remove output on withdraw if leased", the actual fix) and
+`b67e0233` (NULL-check hardening).  Patch + rebuild instructions:
+`~/xwayland-build` and `patches/xwayland-drm-lease-uaf-fix.patch`.
+Note: Ubuntu noble will not ship this backport; a future apt upgrade of
+xwayland overwrites the fix — rebuild from `~/xwayland-build` if the crash
+recurs.  After installing a new Xwayland binary, restart Xwayland
+(`pkill -9 -x Xwayland`; KWin auto-restarts it only after a *crash*, not
+after a clean exit — use `kwin_wayland --replace` in the latter case).
+
+**Mitigation in place** (still useful as belt-and-braces):
 1. `~/.config/kwinrc`: `XwaylandCrashPolicy=1` (Restart).  KWin
    automatically restarts :1 after a crash.
 2. `pixi run monado-stop` now **automatically detects the crash and

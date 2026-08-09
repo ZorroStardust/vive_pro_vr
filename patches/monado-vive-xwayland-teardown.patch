@@ -1,0 +1,37 @@
+--- a/src/xrt/compositor/main/comp_window_direct_nvidia.c
++++ b/src/xrt/compositor/main/comp_window_direct_nvidia.c
+@@ -114,8 +114,23 @@
+ 
+ 	comp_target_swapchain_cleanup(&w_direct->base);
+ 
++	struct vk_bundle *vk = get_vk(ct);
++
+ 	for (uint32_t i = 0; i < w_direct->display_count; i++) {
+ 		struct comp_window_direct_nvidia_display *d = &w_direct->displays[i];
++
++		if (d->display == VK_NULL_HANDLE) {
++			continue;
++		}
++
++		// Release the display before closing the X connection.  The
++		// acquire is backed by an XRandR 1.5 output lease; dropping the
++		// connection while the lease is still held forces Xwayland to
++		// tear the lease down during client disconnect, racing its
++		// Wayland event loop (wl_display_dispatch_queue_pending SEGV).
++		// Explicit release also lets the NVIDIA driver hand DP-3 back,
++		// instead of leaving it "disabled" after monado exits.
++		vk->vkReleaseDisplayEXT(vk->physical_device, d->display);
+ 		d->display = VK_NULL_HANDLE;
+ 		free(d->name);
+ 	}
+@@ -124,6 +139,10 @@
+ 		free(w_direct->displays);
+ 
+ 	if (w_direct->dpy) {
++		// Drain any pending requests before the socket close so the
++		// disconnect is deterministic and does not race in-flight X
++		// traffic in the server.
++		XSync(w_direct->dpy, False);
+ 		XCloseDisplay(w_direct->dpy);
+ 		w_direct->dpy = NULL;
+ 	}

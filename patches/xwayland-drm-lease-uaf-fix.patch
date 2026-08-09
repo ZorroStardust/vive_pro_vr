@@ -1,0 +1,106 @@
+# Backport of upstream xorg/xserver commits to xwayland 23.2.6:
+#   f6cd168d  xwayland: Do not remove output on withdraw if leased (2026-01-25)
+#   b67e0233  hw/xwayland: fix missing NULL checks in DRM lease allocation paths (2026-04-28)
+# Fixes use-after-free in DRM lease teardown: xwl_output freed on connector
+# "withdrawn" while still referenced from rrLease->outputs[] -> SEGV in
+# xwl_randr_lease_cleanup_outputs() (triggered by monado-stop / lease release).
+
+diff --git a/hw/xwayland/xwayland-drm-lease.c b/hw/xwayland/xwayland-drm-lease.c
+--- a/hw/xwayland/xwayland-drm-lease.c
++++ b/hw/xwayland/xwayland-drm-lease.c
+@@ -44,7 +44,24 @@ xwl_randr_lease_cleanup_outputs(RRLeasePtr rrLease)
+ 
+     for (i = 0; i < rrLease->numOutputs; ++i) {
+         output = rrLease->outputs[i]->devPrivate;
+-        output->lease = NULL;
++        if (output) {
++            output->lease = NULL;
++        }
++    }
++}
++
++static void
++xwl_randr_lease_free_outputs(RRLeasePtr rrLease)
++{
++    struct xwl_output *xwl_output;
++    int i;
++
++    for (i = 0; i < rrLease->numOutputs; ++i) {
++        xwl_output = rrLease->outputs[i]->devPrivate;
++        if (xwl_output && xwl_output->withdrawn_connector) {
++            rrLease->outputs[i]->devPrivate = NULL;
++            xwl_output_remove(xwl_output);
++        }
+     }
+ }
+ 
+@@ -71,6 +88,9 @@ drm_lease_handle_finished(void *data,
+         AttendClient(lease->client);
+         xwl_randr_lease_cleanup_outputs(lease->rrLease);
+     }
++
++    /* Free the xwl_outputs that have been withdrawn while lease-able */
++    xwl_randr_lease_free_outputs(lease->rrLease);
+ }
+ 
+ static struct wp_drm_lease_v1_listener drm_lease_listener = {
+@@ -161,9 +161,11 @@ xwl_randr_request_lease(ClientPtr client, ScreenPtr screen, RRLeasePtr rrLease)
+         }
+     }
+ 
++    lease_private = calloc(1, sizeof(struct xwl_drm_lease));
++    if (!lease_private)
++        return BadAlloc;
+     req = wp_drm_lease_device_v1_create_lease_request(
+             lease_device->drm_lease_device);
+-    lease_private = calloc(1, sizeof(struct xwl_drm_lease));
+     for (i = 0; i < rrLease->numOutputs; ++i) {
+         output = rrLease->outputs[i]->devPrivate;
+         output->lease = lease_private;
+@@ -324,7 +344,15 @@ static void
+ lease_connector_handle_withdrawn(void *data,
+                                  struct wp_drm_lease_connector_v1 *wp_drm_lease_connector_v1)
+ {
+-    xwl_output_remove(data);
++    struct xwl_output *xwl_output = data;
++
++    xwl_output->withdrawn_connector = TRUE;
++
++    /* Not removing the xwl_output if currently leased with Wayland */
++    if (xwl_output->lease)
++        return;
++
++    xwl_output_remove(xwl_output);
+ }
+ 
+ static const struct wp_drm_lease_connector_v1_listener lease_connector_listener = {
+@@ -451,10 +453,15 @@ static const struct wp_drm_lease_device_v1_listener drm_lease_device_listener =
+ void
+ xwl_screen_add_drm_lease_device(struct xwl_screen *xwl_screen, uint32_t id)
+ {
+-    struct wp_drm_lease_device_v1 *lease_device = wl_registry_bind(
+-        xwl_screen->registry, id, &wp_drm_lease_device_v1_interface, 1);
+-    struct xwl_drm_lease_device *device_data = malloc(sizeof(struct xwl_drm_lease_device));
++    struct wp_drm_lease_device_v1 *lease_device;
++    struct xwl_drm_lease_device *device_data = calloc(1, sizeof(struct xwl_drm_lease_device));
++
++    if (!device_data) {
++        ErrorF("xwl_screen_add_drm_lease_device: allocation failure\n");
++        return;
++    }
+ 
++    lease_device = wl_registry_bind(xwl_screen->registry, id, &wp_drm_lease_device_v1_interface, 1);
+     device_data->drm_lease_device = lease_device;
+     device_data->xwl_screen = xwl_screen;
+     device_data->drm_read_only_fd = -1;
+diff --git a/hw/xwayland/xwayland-output.h b/hw/xwayland/xwayland-output.h
+--- a/hw/xwayland/xwayland-output.h
++++ b/hw/xwayland/xwayland-output.h
+@@ -67,6 +67,7 @@ struct xwl_output {
+     struct wp_drm_lease_connector_v1 *lease_connector;
+     struct xwl_drm_lease *lease;
+     struct xwl_drm_lease_device *lease_device;
++    Bool withdrawn_connector;
+ };
+ 
+ /* Per client per output emulated randr/vidmode resolution info. */
