@@ -25,6 +25,7 @@ mvs-xr-pink = "mujoco_vive_scripts.xr_pink_world_check:main"
 mvs-xr-mujoco-opengl = "mujoco_vive_scripts.xr_mujoco_opengl:main"
 mvs-xr-crosshair = "mujoco_vive_scripts.xr_crosshair_calibration:main"
 mvs-xr-surgical = "mujoco_vive_scripts.xr_surgical_robot:main"
+mvs-xr-live-video = "mujoco_vive_scripts.xr_live_video:main"
 
 [tool.setuptools.packages.find]
 include = ["mujoco_vive_scripts*"]

@@ -33,6 +33,9 @@ xr-mujoco-opengl-screen = { cmd = "bash scripts/run_xr_mujoco_opengl_screen.sh",
 xr-surgical-screen = { cmd = "bash scripts/run_xr_surgical_screen.sh", cwd = "mujoco_vive_scripts" }
 xr-crosshair-screen = { cmd = "bash scripts/run_xr_crosshair_screen.sh", cwd = "mujoco_vive_scripts" }
 xr-pink-world-screen = { cmd = "bash scripts/run_xr_pink_world_screen.sh", cwd = "mujoco_vive_scripts" }
+xr-live-video = { cmd = "python -m mujoco_vive_scripts.xr_live_video", cwd = "mujoco_vive_scripts" }
+xr-live-video-screen = { cmd = "python -m mujoco_vive_scripts.xr_live_video --screen", cwd = "mujoco_vive_scripts" }
+xr-live-video-testcard = { cmd = "python -m mujoco_vive_scripts.xr_live_video --test-card --screen", cwd = "mujoco_vive_scripts" }
 
 # Detached monado-service (Plan A: setsid + /dev/null + pidfile).
 # monado runs in a new session, immune to Ctrl+C.  stdin=/dev/null is

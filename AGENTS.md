@@ -44,6 +44,9 @@ pixi run install-system-deps
 | OpenXR MuJoCo stereo (comfort controls) | `pixi run xr-mujoco-opengl` |
 | OpenXR crosshair calibration tool | `pixi run xr-crosshair` |
 | OpenXR surgical robot stereo preview | `pixi run xr-surgical` |
+| Endoscope live stereo video → HMD | `pixi run xr-live-video` (defaults: `/dev/video0`+`/dev/video2`, YUYV 1920x1080@60) |
+| Endoscope live video, desktop window | `pixi run xr-live-video-screen` |
+| Endoscope GL path test (no cameras) | `pixi run xr-live-video-testcard` |
 | Shell in pixi env | `pixi shell` |
 | Full TTY direct-mode pipeline | `~/vive_stage1_tmux.sh` (from `script_test/`) |
 

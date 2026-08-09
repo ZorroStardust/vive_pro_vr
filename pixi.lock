@@ -860,7 +860,7 @@ packages:
 - pypi: ./mujoco_vive_scripts
   name: mujoco-vive-scripts
   version: 0.2.0
-  sha256: b095d078e8efd3680933bcc405a72694f3558de02718d16445d019d7008cba37
+  sha256: 8faff9680b1875ee6a2eaca76a9031b514060e8e53bbb908c99ca2bce1ff6aac
   requires_dist:
   - mujoco>=3.1.0
   - numpy>=1.24
