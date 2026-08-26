@@ -157,16 +157,28 @@ DRM lease; Xwayland's `wp_drm_lease_connector_v1.withdrawn` handler frees the
 Full evidence chain (apport core + disassembly + source match) and fix
 record: `mujoco_vive_scripts/xwayland_crash_analysis.md`.
 
-**STATUS: FIXED LOCALLY** (2026-08-10).  A rebuilt `xwayland`
-(23.2.6-1ubuntu0.8, dpkg-installed) backports upstream commits `f6cd168d`
-("Do not remove output on withdraw if leased", the actual fix) and
-`b67e0233` (NULL-check hardening).  Patch + rebuild instructions:
-`~/xwayland-build` and `patches/xwayland-drm-lease-uaf-fix.patch`.
-Note: Ubuntu noble will not ship this backport; a future apt upgrade of
-xwayland overwrites the fix — rebuild from `~/xwayland-build` if the crash
-recurs.  After installing a new Xwayland binary, restart Xwayland
-(`pkill -9 -x Xwayland`; KWin auto-restarts it only after a *crash*, not
-after a clean exit — use `kwin_wayland --replace` in the latter case).
+**STATUS: FIXED LOCALLY** (2026-08-10, re-applied 2026-08-26).  A rebuilt
+`xwayland` (23.2.6-1ubuntu0.8, dpkg-installed) backports upstream commits
+`f6cd168d` ("Do not remove output on withdraw if leased", the actual fix)
+and `b67e0233` (NULL-check hardening).  Full rebuild procedure + incident
+record: `mujoco_vive_scripts/xwayland_rebuild.md`; patch at
+`patches/xwayland-drm-lease-uaf-fix.patch`; sources + built deb at
+`~/xwayland-build`.
+
+**CRITICAL**: the rebuilt package has the SAME version as the distro one,
+so `apt upgrade` can silently reinstall the stock binary over it
+(happened 2026-08-11; crash recurred 2026-08-26 with identical signature).
+After `dpkg -i`, immediately run `sudo apt-mark hold xwayland` and verify
+with `apt-mark showhold`.  Verify the installed binary with
+`file /usr/bin/Xwayland` (patched BuildID = `2b56b7d2...`, stock =
+`d262b443...`).
+
+Ubuntu noble will not ship this backport; on any future xwayland version
+upgrade, check whether upstream already includes `f6cd168d`, else rebuild
+from `~/xwayland-build` per the doc.  After installing a new Xwayland
+binary, restart Xwayland (`pkill -9 -x Xwayland`; KWin auto-restarts it
+only after a *crash*, not after a clean exit — use `kwin_wayland
+--replace` in the latter case).
 
 **Mitigation in place** (still useful as belt-and-braces):
 1. `~/.config/kwinrc`: `XwaylandCrashPolicy=1` (Restart).  KWin
