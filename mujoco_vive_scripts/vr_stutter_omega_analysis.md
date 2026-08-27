@@ -1,113 +1,104 @@
-# VR 画面周期性卡顿 — omega 触觉驱动与 xHCI 干扰分析
+# VR 画面周期性卡顿 — omega 触觉设备与 xHCI 干扰分析
 
-**日期**: 2026-08-27
+**日期**: 2026-08-27（更新：受控实验后）
 **现象**: `xr-live-video`（内窥镜立体视频 → VIVE Pro）与
 `~/projects/surgical_dual_arm_ires` 的 teleop 同时运行时，VR 画面周期性卡顿
-（体感像"游戏丢包"，每次约 0.5–1s，间隔约 10–30s，随会话变密）。
+（体感像"游戏丢包"，每次约 0.5–1s，间隔约 5–30s）。
 
-## 结论（TL;DR）
+## 结论（TL;DR，受控实验后定稿）
 
-触发源是 **Force Dimension omega 触觉主手的 libdhd 驱动**：它以 1kHz 轮询
-两个 omega 设备（`libusb_bulk_transfer`，内部自带 `pthread_create` +
-`pthread_setschedparam` 控制线程）。omega 与采集卡、VIVE IMU 同在 xHCI
-控制器 `0000:80:14.0` 上；dhd 的 RT 线程高频锤打 xHCI → 抢占处理 UVC
-完成的 kworker → 控制器锁竞争 → **UVC 帧交付延迟（采集卡顿）+ VIVE IMU
-延迟（monado 合成器 timing 破坏，渲染卡顿）同时发生**。
+**只要 Force Dimension omega.x 主手 USB 插在本机（即使没有任何软件打开它），
+其固件就以 5.0s 为周期在 USB 总线上产生一个 ~0.9s 的扰动事件，导致同一
+xHCI 控制器（本机唯一的 `0000:80:14.0`）上的等时视频流（两张采集卡）与
+VIVE 链路盒一起周期性丢帧。**
 
-排除项（有实验依据）：内窥镜视频源、采集盒、USB 线/口带宽、GPU/浏览器
-（meshcat）、monado 合成器本身、Xwayland。
+关键性质：
+
+- **与软件完全无关**：不 open、不轮询、不跑 teleop 也能复现（受控实验）；
+  `haptic_poll_hz` 从 1000→200 **无任何效果**。
+- 精确 **5.0s 周期**（30 个簇，间隔 4.9–5.1s），每簇 ~0.9s，期间每眼以
+  ~6.7Hz 交付（正常 60fps），每簇每眼丢 ~50 帧 ≈ 18% 帧损失。
+- 内核日志几乎无痕：仅偶发 `uvcvideo 2-4:1.1: Failed to resubmit video
+  URB (-1)`；无 reset、无枚举事件、无错误。
+- 本机只有 **一个 USB 控制器**（`lspci`：仅 80:14.0，无雷电/第二 xHCI），
+  无法通过换口规避；采集卡、VIVE、omega 全在这一个控制器上。
 
 ## 证据链
 
 ### 1. A/B 实验（templog.md 统计）
 
-| 场景 | 时长 | 采集丢帧事件(每2s<110帧) | UPL≥5ms | 卡顿 |
-|------|------|--------------------------|---------|------|
-| 仅 xr-live-video | 6m52s | **0** | 0 | 无 |
-| xr-live-video + teleop（Edge/meshcat 关）| 4m28s | **31** | 3 | 有 |
-| xr-live-video + teleop 空闲（omega 拔掉）| — | 仅 1 次 | 1 次 | 几乎无 |
-| xr-live-video + teleop 空闲（omega 插着读位置）| — | 大量 | 周期性 | 明显 |
+| 场景 | 采集丢帧事件 | 卡顿 |
+|------|-------------|------|
+| 仅 xr-live-video | **0**（6m52s）| 无 |
+| xr-live-video + teleop（Edge 关）| **31**（4m28s）| 有 |
+| teleop 空闲 + omega 拔掉 | 仅 1 次 | 几乎无 |
+| teleop 空闲 + omega 插着 | 大量，~5s 周期 | 明显 |
+| teleop + haptic_poll_hz=200 | 不变 | 依旧 |
 
-丢帧时左右眼帧计数严格同步（67/67、68/68、109/109…），说明是共同上游，
-而非单路故障。
+### 2. 受控复现实验（决定性，2026-08-27 20:22–20:27）
 
-### 2. 埋点日志（决定性）
+实验设计：裸 `StereoCapture`（无 GL/OpenXR/teleop）+ dhd 探针，分阶段：
+A) 打开设备不轮询 30s，B) 1000Hz 轮询 60s，C) 回到只打开 30s；
+对照组：omega 插着但**完全不打开** 30s。
+
+结果（`/tmp/opencode/cap_gaps.txt`、`phase_control.txt`）：
+
+```
+clusters: 30    intervals: [4.8, 4.9, 5.1, 4.9, 5.0, 5.1, 5.0, ...]  ← 精确 5.0s
+每簇: dur≈0.9s, ~12 个 gap 事件（每眼 ~6），gap≈150ms（= 6.7Hz 交付）
+对照组（插着但不打开）: 同样的 5.0s 簇 → 触发条件是"插着"，与软件无关
+IRQ: 采集时 ~12.5k/s，簇期间略降（等时完成变少）
+kernel: 20:26:03/20:26:35 偶发 "uvcvideo 2-4/2-1: Failed to resubmit video URB (-1)"
+```
+
+### 3. 埋点日志（用户会话）
 
 ```
 [XR GAP] frame loop stalled 62ms @t=33083.5 ...
-[CAP GAP] eye=L 141ms @t=33083.6 select_timeouts_in_gap=0 (0=thread starved, >0=device silent)
-[CAP GAP] eye=R 167ms @t=33083.6 select_timeouts_in_gap=0 ...
+[CAP GAP] eye=L 141ms @t=33083.6 select_timeouts_in_gap=0 ...
 ```
 
-- `select_timeouts_in_gap=0`：采集线程等待 select 期间没有超时——设备一直在
-  交货，恢复后立即有帧。但每 ~150ms 才拿到一波帧。
-- `[XR GAP]`（渲染循环 30–91ms 停顿，正常 11ms）与 `[CAP GAP]` 时间戳重合：
-  渲染线程不碰 USB，却同步卡顿 → 两者共同依赖的组件（xHCI/内核）出问题。
-- LIVE 行 `TO=0/0`：整个会话无一次 0.2s 级 select 超时，无设备错误。
+- `select_timeouts_in_gap=0` + 150ms 稳定间隔 = 设备交付被节流到 ~6.7Hz，
+  不是线程被饿死（饿死会恢复后突发补帧）。
+- `[XR GAP]` 与 `[CAP GAP]` 同步：monado 合成器也受同一扰动影响
+  （VIVE 链路盒在同一控制器上）。
 
-### 3. dmesg（卡顿期间）
+### 4. 已排除的假设（有据）
 
-```
-19:25:28 usb 1-10.2: new high-speed USB device ... 1451:0301 omega.x haptic device
-19:25:31 usb 1-10.3: new high-speed USB device ... 1451:0402 omega.x haptic device
-（之后直到卡顿结束，没有任何 xhci/usb/uvc 事件）
-```
+| 假设 | 排除依据 |
+|------|---------|
+| libdhd RT 优先级线程抢占 | 有效 capability 集为空（`Current: =`）、`RLIMIT_RTPRIO=0`（`ulimit -r`=0，limits.d 仅 pipewire 有 rtprio）→ `pthread_setschedparam(SCHED_FIFO)` 必然 EPERM；实测 dhd 只开一个 SCHED_OTHER 的 `libusb_event` 线程（0% CPU）|
+| USB 事务速率/带宽饱和 | 轮询率 1000→200Hz 症状零变化；open-idle 阶段（几乎零事务）照样 5s 簇；IRQ 速率无尖峰 |
+| CPU 竞争/GIL | 簇在无 teleop、无 Qt、无 IK 的裸实验里同样出现 |
+| 内窥镜源/采集盒/线材 | 拔 omega 即零丢帧，同一源同一线 |
+| GPU/浏览器/meshcat | Edge 关闭仍复现；裸实验无 GL |
+| USB 枚举/复位风暴 | 卡顿期间 dmesg/journalctl 无任何 USB 事件 |
 
-无枚举、无复位、无 error → 不是设备级故障，是**静默的延迟/锁竞争**。
+### 5. libdhd 静态证据（仅供参考）
 
-### 4. libdhd 静态证据
-
-`libdhd.so.3.17.7`（`~/.local/lib/`）：
-
-```
-U pthread_create
-U pthread_setschedparam / pthread_getschedparam
-U timerfd_create / timerfd_settime / nanosleep
-dhdComUSB-libusb.cpp   （libusb-1.0, libusb_bulk_transfer, ...）
-FDO_THREAD_PRIORITY_DEFAULT/HIGH/LOW/MAX/MIN
-```
-
-→ dhd 打开设备时会创建自己的 I/O 控制线程并调整其调度优先级；通信层是
-libusb 同步 bulk 传输。
-
-### 5. 系统条件（让 RT 假设成立）
-
-- `capsh --print`：用户 bounding set 含 `cap_sys_nice` → dhd 设 RT 优先级**会成功**。
-- `/proc/sys/kernel/sched_rt_runtime_us` = 950000（RT 可用 95% CPU 时间）。
-- 全部 20 核 `scaling_governor=powersave`（Intel HWP）。
-- USB 拓扑：采集卡 `2-1`/`2-4`、VIVE 链路盒 `2-9`、omega `1-10.2`/`1-10.3`
-  全部挂在同一个 xHCI 控制器 `0000:80:14.0`（该控制器挂 PCIe 00:06.0 之下，
-  后者 18:14 出现过一次 Correctable RxErr，未见关联）。
-
-### 6. 单次异常的解释
-
-omega 拔掉时（A/B 第 3 行）唯一一次卡顿：haptic 线程每秒重试 `dhd.open()`
-（`reconnect_delay_s=1.0`），每次尝试触发 libusb 全设备扫描
-（`libusb_get_device_list` + open/close 链），偶发尖峰与卡顿重合。
+`libdhd.so.3.17.7`：`pthread_create` + `pthread_setschedparam` + timerfd +
+`libusb_bulk_transfer`（`dhdComUSB-libusb.cpp`）。但这些与卡顿无关——
+扰动在设备未打开时也存在，纯属固件/电气层行为。
 
 ## 缓解方案与状态
 
 | # | 方案 | 状态 |
 |---|------|------|
-| 1 | **teleop 降低轮询率** `haptic_poll_hz` 1000→200（映射循环仅 50Hz，200Hz 余量 4×）；可选 `force_feedback=False` 再砍一半 USB 写流量 | 待验证（2026-08-27 已改配置）|
-| 2 | LD_PRELOAD shim 拦截 `pthread_setschedparam`，让 dhd 控制线程保持普通优先级（若验证到 FF 线程满核跑）| 备用 |
-| 3 | `taskset` 把 teleop 钉在固定核，隔离纯 CPU 竞争 | 备用（对锁竞争无效）|
-| 长期 | Force Dimension SDK 通用行为；teleop 50Hz 映射无需 1kHz 位置采样，建议默认低轮询 | — |
+| 1 | ~~降低轮询率~~ `haptic_poll_hz` 1000→200 | **无效**（保留无害）|
+| 2 | **PCIe USB3 扩展卡**（Renesas/ASMedia xHCI）插 omega——把 5s 扰动隔离到第二控制器 | **推荐长期修复**（本机无第二控制器）|
+| 3 | 不遥操作时**拔掉 omega** | 已验证有效（templog 实验 3）|
+| 4 | **强制挂起 omega 端口**（VR-only 会话软件替代拔线）：`script_test/omega_usb_suspend.sh off/on`（sudo 写 `power/level=suspend`）| 待验证；遥操作前须 `on` 恢复 |
+| 5 | omega 固件升级 / 询问 Force Dimension | 远期 |
 
 ### 验证方法（复现时）
 
 ```bash
-# 卡顿发生时另一终端：
-ps -eLo pid,tid,cls,pri,pcpu,comm --sort=-pcpu | head -20
-# 看 teleop python 进程里是否有 cls=FF/RR、pri 高、%CPU 满核的线程
-cat /proc/<teleop_pid>/task/<tid>/sched | head -3   # 确认调度策略
+script_test/omega_usb_suspend.sh off    # 挂起后观察 xr-live-video 是否不再有 [CAP GAP]
+script_test/omega_usb_suspend.sh on     # 恢复
 ```
-
-若 FF 线程实锤 → 上方案 2；若降频后卡顿消失/按比例减轻 → 方案 1 即长期修复。
 
 ## 相关埋点（已合入 xr-live-video，commit 4091c01）
 
 - LIVE 行：`DT=`（打印间隔）、`TO=L/R`（select 超时计数）
 - `[CAP GAP]`：采集停顿事件 `eye/gap_ms/@t/select_timeouts_in_gap`
 - `[XR GAP]`：渲染循环停顿（>30ms，正常 11ms）
-- 判别规则：timeouts=0 → 线程被饿死或 <200ms 的设备交付延迟；>0 → 设备静默
