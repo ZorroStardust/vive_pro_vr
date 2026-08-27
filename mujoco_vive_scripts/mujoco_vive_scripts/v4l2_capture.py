@@ -582,6 +582,83 @@ def detect_capture_devices() -> list[str]:
     return devices
 
 
+# ---- USB topology diagnostics ---------------------------------------------
+
+_USB_DEV_CHILD_RE = re.compile(r"^\d+-\d+(\.\d+)*$")
+
+
+def _usb_device_sysdirs() -> list[str]:
+    """Real sysfs dirs of every enumerated USB device (excluding interfaces)."""
+    base = "/sys/bus/usb/devices"
+    out = []
+    try:
+        names = os.listdir(base)
+    except OSError:
+        return out
+    for name in sorted(names):
+        if ":" in name:
+            continue
+        d = os.path.realpath(os.path.join(base, name))
+        if os.path.exists(os.path.join(d, "idVendor")):
+            out.append(d)
+    return out
+
+
+def _hub_children(sysdir: str) -> list[str]:
+    return [e for e in os.listdir(sysdir) if _USB_DEV_CHILD_RE.match(e)]
+
+
+def _is_usb_hub(sysdir: str) -> bool:
+    cls = _sys_read(os.path.join(sysdir, "bDeviceClass"))
+    try:
+        return int(cls, 16) == 9
+    except (TypeError, ValueError):
+        return False
+
+
+def empty_usb_hubs() -> list[str]:
+    """USB device names of hubs that currently have no downstream devices.
+
+    HTC (0bb4) hubs are skipped: resetting the VIVE link-box chain is risky.
+    """
+    hubs = []
+    for d in _usb_device_sysdirs():
+        if not _is_usb_hub(d):
+            continue
+        if _sys_read(os.path.join(d, "idVendor")) == "0bb4":
+            continue
+        if not _hub_children(d):
+            hubs.append(os.path.basename(d))
+    return hubs
+
+
+def usb_topology_report() -> list[str]:
+    """Human-readable summary of USB hubs and capture boxes for debugging."""
+    hubs, cypress = [], []
+    for d in _usb_device_sysdirs():
+        vendor = _sys_read(os.path.join(d, "idVendor")) or ""
+        prod = _sys_read(os.path.join(d, "product")) or ""
+        speed = _sys_read(os.path.join(d, "speed")) or "?"
+        name = os.path.basename(d)
+        if vendor == "04b4":
+            cypress.append(f"{name} ({prod}) speed={speed}M")
+        if _is_usb_hub(d):
+            hubs.append(
+                f"{name} ({prod}) upstream={speed}M children={len(_hub_children(d))}"
+            )
+    lines = [
+        "USB hubs: " + ("; ".join(hubs) if hubs else "none found"),
+        "Cypress capture boxes: " + ("; ".join(cypress) if cypress else "NONE on any USB bus"),
+    ]
+    if not cypress:
+        lines.append(
+            "No capture boxes enumerated — check the hub's power adapter and "
+            "re-seat the cards, or run `pixi run usb-recover` to power-cycle "
+            "empty hubs."
+        )
+    return lines
+
+
 # ---- Link-budget based fourcc selection ------------------------------------
 
 # Practical isochronous capacity per shared-link speed (MB/s).  5 Gbps is

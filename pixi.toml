@@ -36,6 +36,7 @@ xr-pink-world-screen = { cmd = "bash scripts/run_xr_pink_world_screen.sh", cwd =
 xr-live-video = { cmd = "python -m mujoco_vive_scripts.xr_live_video", cwd = "mujoco_vive_scripts" }
 xr-live-video-screen = { cmd = "python -m mujoco_vive_scripts.xr_live_video --screen", cwd = "mujoco_vive_scripts" }
 xr-live-video-testcard = { cmd = "python -m mujoco_vive_scripts.xr_live_video --test-card --screen", cwd = "mujoco_vive_scripts" }
+usb-recover = { cmd = "python -m mujoco_vive_scripts.usb_recover", cwd = "mujoco_vive_scripts" }
 
 # Detached monado-service (Plan A: setsid + /dev/null + pidfile).
 # monado runs in a new session, immune to Ctrl+C.  stdin=/dev/null is

@@ -47,6 +47,7 @@ pixi run install-system-deps
 | Endoscope live stereo video → HMD | `pixi run xr-live-video` (auto-detects the two Cypress `04b4:00f9` capture boxes, skipping the VIVE HMD camera; override with `--left-dev/--right-dev`, 1920x1080@60; `--fourcc auto` (default) picks YUYV vs NV12 from the shared USB link budget — a 5G hub forces NV12) |
 | Endoscope live video, desktop window | `pixi run xr-live-video-screen` |
 | Endoscope GL path test (no cameras) | `pixi run xr-live-video-testcard` |
+| USB capture-box recovery (power-cycle empty hubs, needs sudo) | `pixi run usb-recover` |
 | Shell in pixi env | `pixi shell` |
 | Full TTY direct-mode pipeline | `~/vive_stage1_tmux.sh` (from `script_test/`) |
 

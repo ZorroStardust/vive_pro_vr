@@ -41,7 +41,12 @@ from .config_util import (
     load_comfort,
     save_full_config,
 )
-from .v4l2_capture import StereoCapture, detect_capture_devices, link_budget_fourcc
+from .v4l2_capture import (
+    StereoCapture,
+    detect_capture_devices,
+    link_budget_fourcc,
+    usb_topology_report,
+)
 
 HINT = """
 Endoscope Live Video Controls
@@ -364,6 +369,10 @@ def _resolve_capture_devices(left: str | None, right: str | None) -> tuple[str, 
     boxes = detect_capture_devices()
     if boxes:
         print(f"[INFO] Auto-detected capture box(es): {', '.join(boxes)}")
+    if len(boxes) < 2:
+        print("[WARN] Fewer than 2 capture boxes detected. USB topology:")
+        for line in usb_topology_report():
+            print(f"  {line}")
     if left is None:
         left = next((b for b in boxes if b != right), boxes[0] if boxes else None)
     if right is None:
