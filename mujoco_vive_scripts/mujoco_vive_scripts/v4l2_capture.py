@@ -580,3 +580,125 @@ def detect_capture_devices() -> list[str]:
     ):
         devices.reverse()
     return devices
+
+
+# ---- Link-budget based fourcc selection ------------------------------------
+
+# Practical isochronous capacity per shared-link speed (MB/s).  5 Gbps is
+# conservatively 420 MB/s: two 1080p60 YUYV streams (~513 MB/s) don't fit,
+# two NV12 streams (~384 MB/s) do.
+_USB_LINK_CAPACITY_MBPS = {480: 40.0, 5000: 420.0, 10000: 900.0, 20000: 1800.0}
+_BPP = {"YUYV": 2.0, "NV12": 1.5}
+_ISOC_OVERHEAD = 1.03
+
+
+class _V4L2FmtDesc(ctypes.Structure):
+    _fields_ = [
+        ("index", ctypes.c_uint32),
+        ("type", ctypes.c_uint32),
+        ("flags", ctypes.c_uint32),
+        ("desc", ctypes.c_ubyte * 32),
+        ("pixelformat", ctypes.c_uint32),
+        ("reserved", ctypes.c_uint32 * 4),
+    ]
+
+
+VIDIOC_ENUM_FMT = _ioc(_IOC_WRITE | _IOC_READ, "V", 2, ctypes.sizeof(_V4L2FmtDesc))
+
+
+def _node_supports_fourcc(path: str, fourcc: str) -> bool:
+    """Read-only ENUM_FMT probe: does this video node advertise *fourcc*?"""
+    wanted = _FOURCCS.get(fourcc)
+    if wanted is None:
+        return False
+    try:
+        fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
+    except OSError:
+        return False
+    try:
+        for i in range(32):
+            m = _V4L2FmtDesc()
+            m.index = i
+            m.type = V4L2_BUF_TYPE_VIDEO_CAPTURE
+            try:
+                _ioctl(fd, VIDIOC_ENUM_FMT, m)
+            except OSError:
+                break
+            if m.pixelformat == wanted:
+                return True
+        return False
+    finally:
+        os.close(fd)
+
+
+def _usb_ancestor_speeds(sysdir: str) -> list[tuple[str, int]]:
+    """Collect (dir, speed_mbps) for every USB device on the path to the root."""
+    chain = []
+    parent = os.path.dirname(os.path.realpath(sysdir))
+    for _ in range(10):
+        speed = _sys_read(os.path.join(parent, "speed"))
+        if speed is not None:
+            try:
+                chain.append((parent, int(speed)))
+            except ValueError:
+                pass
+        grand = os.path.dirname(parent)
+        if grand == parent:
+            break
+        parent = grand
+    return chain
+
+
+def link_budget_fourcc(left_dev: str, right_dev: str,
+                       width: int, height: int, fps: int) -> tuple[str, str]:
+    """Choose YUYV or NV12 from the shared upstream USB link speed.
+
+    Returns ``(fourcc, reason)``.  The deepest common USB ancestor of the
+    two device nodes is the shared link; its speed caps the aggregate
+    isochronous payload of both streams.
+    """
+    chains = []
+    for dev in (left_dev, right_dev):
+        sysdir = f"/sys/class/video4linux/{os.path.basename(dev)}"
+        if not os.path.exists(sysdir):
+            return "YUYV", f"fourcc=YUYV: no sysfs entry for {dev}"
+        chains.append({path: speed for path, speed in _usb_ancestor_speeds(sysdir)})
+
+    common = None
+    shared_mbps = None
+    for path, speed in chains[0].items():
+        if path in chains[1]:
+            common = path
+            shared_mbps = speed
+            break
+    if common is None or shared_mbps is None:
+        return "YUYV", "fourcc=YUYV: no shared USB ancestor found"
+
+    capacity = next(
+        (c for s, c in sorted(_USB_LINK_CAPACITY_MBPS.items()) if s >= shared_mbps),
+        _USB_LINK_CAPACITY_MBPS[20000],
+    )
+    yuyv_bw = width * height * _BPP["YUYV"] * fps * 2 * _ISOC_OVERHEAD / 1e6
+    nv12_bw = width * height * _BPP["NV12"] * fps * 2 * _ISOC_OVERHEAD / 1e6
+    hub = f"shared {shared_mbps} Mbps upstream ({os.path.basename(common)})"
+
+    if yuyv_bw <= capacity:
+        return "YUYV", (
+            f"fourcc=YUYV: {hub} carries {yuyv_bw:.0f} MB/s "
+            f"(2 streams) under {capacity:.0f} MB/s"
+        )
+    if nv12_bw > capacity:
+        return "NV12", (
+            f"fourcc=NV12: {hub} cannot carry even NV12 ({nv12_bw:.0f} MB/s > "
+            f"{capacity:.0f} MB/s); expect frame loss — lower --fps"
+        )
+    if (_node_supports_fourcc(left_dev, "NV12")
+            and _node_supports_fourcc(right_dev, "NV12")):
+        return "NV12", (
+            f"fourcc=NV12: {hub} cannot carry {yuyv_bw:.0f} MB/s YUYV; "
+            f"NV12 ({nv12_bw:.0f} MB/s, 4:2:0) fits"
+        )
+    return "YUYV", (
+        f"fourcc=YUYV: {hub} needs {yuyv_bw:.0f} MB/s but the boxes lack NV12; "
+        f"expect frame loss"
+    )

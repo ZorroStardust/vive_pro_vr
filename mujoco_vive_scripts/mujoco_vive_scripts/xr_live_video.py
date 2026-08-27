@@ -41,7 +41,7 @@ from .config_util import (
     load_comfort,
     save_full_config,
 )
-from .v4l2_capture import StereoCapture, detect_capture_devices
+from .v4l2_capture import StereoCapture, detect_capture_devices, link_budget_fourcc
 
 HINT = """
 Endoscope Live Video Controls
@@ -395,7 +395,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--width", type=int, default=1920)
     parser.add_argument("--height", type=int, default=1080)
     parser.add_argument("--fps", type=int, default=60)
-    parser.add_argument("--fourcc", choices=("YUYV", "NV12"), default="YUYV")
+    parser.add_argument(
+        "--fourcc", choices=("auto", "YUYV", "NV12"), default="auto",
+        help="Pixel format: 'auto' picks YUYV/NV12 from the shared USB link budget.",
+    )
     parser.add_argument(
         "--fit", choices=FIT_MODES, default="fit-width",
         help="Aspect adaptation: fit-width letterboxes vertically (default).",
@@ -421,6 +424,12 @@ def parse_args() -> argparse.Namespace:
         args.left_dev, args.right_dev = _resolve_capture_devices(
             args.left_dev, args.right_dev
         )
+        if args.fourcc == "auto":
+            args.fourcc, reason = link_budget_fourcc(
+                args.left_dev, args.right_dev,
+                args.width, args.height, args.fps,
+            )
+            print(f"[INFO] {reason}")
     return args
 
 
