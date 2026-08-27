@@ -373,6 +373,15 @@ class StereoCapture:
         self._stop = threading.Event()
         self._threads: list[threading.Thread] = []
 
+        # stall diagnostics: select-timeout counters and per-eye inter-frame
+        # gaps.  A gap with timeouts==0 means the capture thread was starved
+        # by the scheduler; timeouts>0 means the device itself went silent.
+        self._timeouts: list[int] = [0, 0]
+        self._timeouts_since_dq: list[int] = [0, 0]
+        self._last_dq_ts: list[float] = [0.0, 0.0]
+        self._max_gap: list[float] = [0.0, 0.0]
+        self._gap_events: list[tuple[float, int, float, int]] = []
+
     def start(self) -> None:
         self._stop.clear()
         for i in range(2):
@@ -414,7 +423,16 @@ class StereoCapture:
                 "errors": [self._errors[i] for i in range(2)],
                 "status": list(self._status),
                 "seq": list(self._seq),
+                "timeouts": list(self._timeouts),
+                "max_gap": list(self._max_gap),
             }
+
+    def drain_gap_events(self) -> list[tuple[float, int, float, int]]:
+        """Pop buffered stall events: (wall_ts, eye, gap_s, timeouts_in_gap)."""
+        with self._lock:
+            events = list(self._gap_events)
+            self._gap_events.clear()
+            return events
 
     def _publish(self, i: int, rgb: np.ndarray) -> None:
         with self._lock:
@@ -442,13 +460,33 @@ class StereoCapture:
             self._devices[i] = dev
             with self._lock:
                 self._status[i] = f"streaming {dev.width}x{dev.height} {self._fourcc}"
+            self._last_dq_ts[i] = 0.0
+            self._timeouts_since_dq[i] = 0
 
             while not self._stop.is_set():
                 try:
                     dq = dev.dequeue(timeout_s=0.2)
                     if dq is None:
+                        with self._lock:
+                            self._timeouts[i] += 1
+                            self._timeouts_since_dq[i] += 1
                         continue
                     index, bytesused = dq
+                    now = time.perf_counter()
+                    prev = self._last_dq_ts[i]
+                    if prev > 0.0:
+                        gap = now - prev
+                        if gap > self._max_gap[i]:
+                            self._max_gap[i] = gap
+                        if gap > 0.1:
+                            with self._lock:
+                                self._gap_events.append(
+                                    (now, i, gap, self._timeouts_since_dq[i])
+                                )
+                                if len(self._gap_events) > 64:
+                                    del self._gap_events[:32]
+                    self._last_dq_ts[i] = now
+                    self._timeouts_since_dq[i] = 0
                     rgb = dev.convert(dev.frame(index, bytesused), dev.width, dev.height)
                     try:
                         dev.queue(index)

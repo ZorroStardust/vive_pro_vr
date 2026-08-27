@@ -342,14 +342,16 @@ def _cycle_fit(renderer: VideoStereoRenderer) -> None:
 
 
 def _print_state(renderer: VideoStereoRenderer, comfort: RuntimeComfortState,
-                 capture: StereoCapture | None, capture_stats: dict) -> None:
+                 capture: StereoCapture | None, capture_stats: dict,
+                 wall_dt: float) -> None:
     if capture is None:
         cam = "TEST-CARD"
     else:
         seq_l, seq_r = capture.seqs()
         cam = f"L{seq_l:5d} R{seq_r:5d}"
+    timeouts = capture_stats.get("timeouts", [0, 0])
     print(
-        f"\r[LIVE] {cam}  "
+        f"\r[LIVE] {cam}  DT={wall_dt:4.2f}s  TO={timeouts[0]}/{timeouts[1]}  "
         f"FIT={renderer.fit:<10} "
         f"ZOOM={comfort.zoom:.2f}  "
         f"SF={comfort.scene_farther_px:+.1f}  "
@@ -512,9 +514,19 @@ def main() -> int:
             )
             renderer.ensure_textures()
 
+            last_frame_ts = time.perf_counter()
             for _frame_index, frame_state in enumerate(s.frame_loop()):
                 if not running:
                     break
+
+                iter_ts = time.perf_counter()
+                iter_gap = iter_ts - last_frame_ts
+                last_frame_ts = iter_ts
+                if iter_gap > 0.030:
+                    print(
+                        f"\n[XR GAP] frame loop stalled {iter_gap * 1000:.0f}ms "
+                        f"@t={iter_ts:.1f} (vsync 11ms; >30ms = compositor/GPU stall)"
+                    )
 
                 for view_index, _view in enumerate(s.view_loop(frame_state)):
                     renderer.render_eye(
@@ -527,9 +539,17 @@ def main() -> int:
                 now = time.perf_counter()
                 if now - last >= args.print_every:
                     stats = capture.stats() if capture is not None else {}
-                    _print_state(renderer, comfort, capture, stats)
+                    _print_state(renderer, comfort, capture, stats, now - last)
                     frames = 0
                     last = now
+                    if capture is not None:
+                        for ts, eye, gap, to in capture.drain_gap_events():
+                            print(
+                                f"\n[CAP GAP] eye={'L' if eye == 0 else 'R'} "
+                                f"{gap * 1000:.0f}ms @t={ts:.1f} "
+                                f"select_timeouts_in_gap={to} "
+                                f"(0=thread starved, >0=device silent)"
+                            )
 
                 def _unhandled_cb(ch: str) -> bool:
                     if ch == "f":
