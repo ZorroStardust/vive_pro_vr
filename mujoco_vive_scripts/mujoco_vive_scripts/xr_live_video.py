@@ -41,7 +41,7 @@ from .config_util import (
     load_comfort,
     save_full_config,
 )
-from .v4l2_capture import StereoCapture
+from .v4l2_capture import StereoCapture, detect_capture_devices
 
 HINT = """
 Endoscope Live Video Controls
@@ -357,6 +357,26 @@ def _print_state(renderer: VideoStereoRenderer, comfort: RuntimeComfortState,
     )
 
 
+def _resolve_capture_devices(left: str | None, right: str | None) -> tuple[str, str]:
+    """Fill in missing device nodes by auto-detection, else old defaults."""
+    if left is not None and right is not None:
+        return left, right
+    boxes = detect_capture_devices()
+    if boxes:
+        print(f"[INFO] Auto-detected capture box(es): {', '.join(boxes)}")
+    if left is None:
+        left = next((b for b in boxes if b != right), boxes[0] if boxes else None)
+    if right is None:
+        right = next((b for b in boxes if b != left), boxes[0] if boxes else None)
+    if left is None:
+        left = "/dev/video0"
+        print("[WARN] No capture box auto-detected; falling back to /dev/video0 for left.")
+    if right is None:
+        right = "/dev/video2"
+        print("[WARN] No capture box auto-detected; falling back to /dev/video2 for right.")
+    return left, right
+
+
 def parse_args() -> argparse.Namespace:
     calib = load_calibration()
     comfort = load_comfort()
@@ -364,8 +384,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Live stereo endoscope video to VIVE Pro (OpenXR) or a desktop window."
     )
-    parser.add_argument("--left-dev", default="/dev/video0")
-    parser.add_argument("--right-dev", default="/dev/video2")
+    parser.add_argument(
+        "--left-dev", default=None,
+        help="Left capture device node (default: auto-detect capture boxes, skipping the VIVE HMD camera).",
+    )
+    parser.add_argument(
+        "--right-dev", default=None,
+        help="Right capture device node (default: auto-detect).",
+    )
     parser.add_argument("--width", type=int, default=1920)
     parser.add_argument("--height", type=int, default=1080)
     parser.add_argument("--fps", type=int, default=60)
@@ -390,7 +416,12 @@ def parse_args() -> argparse.Namespace:
     add_calibration_args(parser, calib)
     add_comfort_args(parser, comfort)
     add_screen_args(parser)
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.test_card:
+        args.left_dev, args.right_dev = _resolve_capture_devices(
+            args.left_dev, args.right_dev
+        )
+    return args
 
 
 def main() -> int:

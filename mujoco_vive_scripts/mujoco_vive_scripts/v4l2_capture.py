@@ -16,6 +16,7 @@ from __future__ import annotations
 import ctypes
 import mmap
 import os
+import re
 import select
 import threading
 import time
@@ -106,6 +107,7 @@ class _V4L2StreamParm(ctypes.Structure):
 # kernel ABI (Ubuntu 24.04 / kernel 6.8 headers: v4l2_format=208,
 # v4l2_buffer=88, streamparm=204, requestbuffers=20).
 VIDIOC_S_FMT = _ioc(_IOC_WRITE | _IOC_READ, "V", 5, ctypes.sizeof(_V4L2Format))
+VIDIOC_G_FMT = _ioc(_IOC_WRITE | _IOC_READ, "V", 4, ctypes.sizeof(_V4L2Format))
 VIDIOC_S_PARM = _ioc(_IOC_WRITE | _IOC_READ, "V", 22, ctypes.sizeof(_V4L2StreamParm))
 VIDIOC_REQBUFS = _ioc(_IOC_WRITE | _IOC_READ, "V", 8, ctypes.sizeof(_V4L2RequestBuffers))
 VIDIOC_QUERYBUF = _ioc(_IOC_WRITE | _IOC_READ, "V", 9, ctypes.sizeof(_V4L2Buffer))
@@ -470,3 +472,111 @@ class StereoCapture:
                 self._status[i] = "stopped"
             if not self._stop.is_set():
                 self._stop.wait(1.0)
+
+
+# ---- Device auto-detection -------------------------------------------------
+
+# Cypress EZ-USB FX3 based capture boxes used on this rig.  The VIVE Pro's
+# built-in Multimedia Camera (idVendor 0bb4) is deliberately excluded.
+_CAPTURE_USB_IDS = {("04b4", "00f9")}
+
+
+def _sys_read(path: str) -> str | None:
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def _usb_ids(sysdir: str) -> tuple[str, str] | None:
+    """Walk parent dirs of a video4linux sysfs node to the USB device dir."""
+    parent = os.path.dirname(os.path.realpath(sysdir))
+    for _ in range(8):
+        vendor = _sys_read(os.path.join(parent, "idVendor"))
+        product = _sys_read(os.path.join(parent, "idProduct"))
+        if vendor:
+            return vendor, product
+        parent = os.path.dirname(parent)
+    return None
+
+
+def _usb_device_dir(sysdir: str) -> str | None:
+    parent = os.path.dirname(os.path.realpath(sysdir))
+    for _ in range(8):
+        if _sys_read(os.path.join(parent, "idVendor")):
+            return parent
+        parent = os.path.dirname(parent)
+    return None
+
+
+def _natural_bus_port_key(busport: str) -> tuple:
+    return tuple(int(p) for p in re.split(r"[-.]", busport))
+
+
+def _probe_capture_node(path: str) -> bool:
+    """Read-only G_FMT probe; the streaming node of a UVC pair answers it."""
+    try:
+        fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
+    except OSError:
+        return False
+    try:
+        fmt = _V4L2Format()
+        fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE
+        _ioctl(fd, VIDIOC_G_FMT, fmt)
+        w = int.from_bytes(fmt.pix[0:4], "little")
+        h = int.from_bytes(fmt.pix[4:8], "little")
+        return w > 0 and h > 0
+    except OSError:
+        return False
+    finally:
+        os.close(fd)
+
+
+def detect_capture_devices() -> list[str]:
+    """Find USB UVC capture boxes, skipping the VIVE HMD camera.
+
+    Returns video node paths sorted by USB bus/port.  Each box exposes two
+    video nodes; the non-streaming one (which rejects G_FMT) is filtered out
+    with a read-only ioctl probe.  Boxes negotiated at USB2 (480 Mbps) get a
+    bandwidth warning: 1080p60 YUYV needs ~2 Gbps per stream.
+    """
+    boxes: dict[str, tuple[str, str, str]] = {}  # usb dev dir -> (node, name, speed)
+    for n in range(64):
+        sysdir = f"/sys/class/video4linux/video{n}"
+        if not os.path.exists(sysdir):
+            continue
+        name = _sys_read(os.path.join(sysdir, "name")) or ""
+        if "vive" in name.lower():
+            continue
+        ids = _usb_ids(sysdir)
+        if ids not in _CAPTURE_USB_IDS and "capture" not in name.lower():
+            continue
+        if not _probe_capture_node(f"/dev/video{n}"):
+            continue
+        devdir = _usb_device_dir(sysdir)
+        if devdir is None:
+            continue
+        if devdir not in boxes:
+            boxes[devdir] = (f"/dev/video{n}", name, _sys_read(os.path.join(devdir, "speed")) or "?")
+    ordered = sorted(boxes, key=lambda d: _natural_bus_port_key(os.path.basename(d)))
+    devices = [boxes[d][0] for d in ordered]
+    names = [boxes[d][1] for d in ordered]
+    for d in ordered:
+        node, name, speed = boxes[d]
+        if speed == "480":
+            print(
+                f"[WARN] {node} ({name}) negotiated USB2 (480 Mbps); "
+                f"1080p60 YUYV needs ~2 Gbps per stream — expect very low FPS. "
+                f"Move it to a USB3 port."
+            )
+    # The JS3350 box is wired to the left eye on this rig.  When the two
+    # boxes carry distinct product strings, prefer JS3350 for the left eye
+    # so sides survive port shuffles; press 'o' to swap if re-cabled.
+    if (
+        len(devices) == 2
+        and any("JS3350" in nm.upper() for nm in names)
+        and "JS3350" not in names[0].upper()
+    ):
+        devices.reverse()
+    return devices
