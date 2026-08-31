@@ -67,6 +67,79 @@ Endoscope Live Video Controls
 
 FIT_MODES = ("fit-width", "fit-height", "stretch", "1:1")
 
+_YUV_VERTEX_SHADER = """
+#version 120
+varying vec2 v_texcoord;
+
+void main() {
+    gl_Position = ftransform();
+    v_texcoord = gl_MultiTexCoord0.xy;
+}
+"""
+
+_YUYV_FRAGMENT_SHADER = """
+#version 120
+uniform sampler2D u_yuyv;
+uniform float u_video_width;
+varying vec2 v_texcoord;
+
+vec3 yuv_to_rgb(float y, float u, float v) {
+    return clamp(vec3(
+        y + 1.402000 * v,
+        y - 0.344136 * u - 0.714136 * v,
+        y + 1.772000 * u
+    ), 0.0, 1.0);
+}
+
+void main() {
+    float source_x = clamp(
+        v_texcoord.x * u_video_width - 0.5, 0.0, u_video_width - 1.0
+    );
+    float pixel_x = clamp(floor(source_x), 0.0, u_video_width - 1.0);
+    float next_x = clamp(pixel_x + 1.0, 0.0, u_video_width - 1.0);
+    float pair_x = floor(pixel_x * 0.5);
+    float next_pair_x = floor(next_x * 0.5);
+    float pair_u = (pair_x + 0.5) / (u_video_width * 0.5);
+    float next_pair_u = (next_pair_x + 0.5) / (u_video_width * 0.5);
+    vec4 yuyv_sample = texture2D(u_yuyv, vec2(pair_u, v_texcoord.y));
+    vec4 next_sample = texture2D(
+        u_yuyv, vec2(next_pair_u, v_texcoord.y)
+    );
+    float y = mix(
+        yuyv_sample.r, yuyv_sample.b, step(0.5, mod(pixel_x, 2.0))
+    );
+    float next_y = mix(
+        next_sample.r, next_sample.b, step(0.5, mod(next_x, 2.0))
+    );
+    float fraction = clamp(fract(source_x), 0.0, 1.0);
+    y = mix(y, next_y, fraction);
+    float u = mix(yuyv_sample.g, next_sample.g, fraction)
+              - (128.0 / 255.0);
+    float v = mix(yuyv_sample.a, next_sample.a, fraction)
+              - (128.0 / 255.0);
+    gl_FragColor = vec4(yuv_to_rgb(y, u, v), 1.0);
+}
+"""
+
+_NV12_FRAGMENT_SHADER = """
+#version 120
+uniform sampler2D u_y;
+uniform sampler2D u_uv;
+varying vec2 v_texcoord;
+
+void main() {
+    float y = texture2D(u_y, v_texcoord).r;
+    vec2 chroma = texture2D(u_uv, v_texcoord).rg
+                  - vec2(128.0 / 255.0);
+    vec3 rgb = vec3(
+        y + 1.402000 * chroma.y,
+        y - 0.344136 * chroma.x - 0.714136 * chroma.y,
+        y + 1.772000 * chroma.x
+    );
+    gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), 1.0);
+}
+"""
+
 
 def _make_test_card(view_index: int, width: int, height: int) -> np.ndarray:
     """Static checkerboard + border used to validate the GL path without cameras."""
@@ -99,12 +172,11 @@ def _make_test_card(view_index: int, width: int, height: int) -> np.ndarray:
 
 
 class VideoStereoRenderer:
-    """Renders the latest captured left/right RGB frames as textured quads.
+    """Render raw YUYV/NV12 capture frames with GPU color conversion.
 
-    One GL texture per eye, uploaded only when a new frame arrives for that
-    source.  The quad geometry encodes fit mode, digital zoom, calibration
-    offsets and the comfort scene shift; immediate-mode GL works because the
-    shared EGL/GLFW contexts are compatibility profile.
+    Capture threads publish immutable YUV bytes; this renderer uploads only
+    a newly published frame and converts it in a fragment shader.  Test-card
+    mode intentionally keeps the original RGB texture path.
     """
 
     def __init__(
@@ -116,6 +188,7 @@ class VideoStereoRenderer:
         flip_v: bool = False,
         test_card: bool = False,
         capture: StereoCapture | None = None,
+        fourcc: str | None = None,
     ):
         self.vid_w = width
         self.vid_h = height
@@ -124,10 +197,22 @@ class VideoStereoRenderer:
         self.flip_v = flip_v
         self.test_card = test_card
         self.capture = capture
+        self.pixel_format = "RGB" if test_card else (
+            fourcc or (capture.fourcc if capture is not None else "YUYV")
+        )
+        if self.pixel_format not in ("RGB", "YUYV", "NV12"):
+            raise ValueError(f"Unsupported renderer pixel format: {self.pixel_format}")
+        if self.pixel_format != "RGB" and (width % 2 or height % 2):
+            raise ValueError(
+                f"{self.pixel_format} rendering requires even dimensions, "
+                f"got {width}x{height}"
+            )
 
-        self._textures: list[int] = [0, 0]
+        self._textures: list[list[int]] = [[], []]
         self._tex_seq: list[int] = [-2, -2]
         self._test_frames: list[np.ndarray | None] = [None, None]
+        self._program = 0
+        self._uniforms: dict[str, int] = {}
         self._last_vp = (0, 0)
 
         self.upload_ms = 0.0
@@ -135,63 +220,116 @@ class VideoStereoRenderer:
 
     # -- GL resource setup --------------------------------------------------
 
+    @staticmethod
+    def _allocate_texture(width: int, height: int, internal_format: int,
+                          external_format: int, linear: bool) -> int:
+        GL = _get_gl()
+        tex = int(GL.glGenTextures(1))
+        GL.glBindTexture(GL.GL_TEXTURE_2D, tex)
+        GL.glTexImage2D(
+            GL.GL_TEXTURE_2D, 0, internal_format,
+            width, height, 0, external_format, GL.GL_UNSIGNED_BYTE, None,
+        )
+        filtering = GL.GL_LINEAR if linear else GL.GL_NEAREST
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, filtering)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, filtering)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+        return tex
+
+    def _compile_yuv_shader(self) -> None:
+        if self.pixel_format == "RGB" or self._program:
+            return
+        GL = _get_gl()
+        from OpenGL.GL.shaders import compileProgram, compileShader
+
+        fragment = (
+            _YUYV_FRAGMENT_SHADER
+            if self.pixel_format == "YUYV"
+            else _NV12_FRAGMENT_SHADER
+        )
+        self._program = int(compileProgram(
+            compileShader(_YUV_VERTEX_SHADER, GL.GL_VERTEX_SHADER),
+            compileShader(fragment, GL.GL_FRAGMENT_SHADER),
+        ))
+        names = (
+            ("u_yuyv", "u_video_width")
+            if self.pixel_format == "YUYV"
+            else ("u_y", "u_uv")
+        )
+        self._uniforms = {
+            name: int(GL.glGetUniformLocation(self._program, name))
+            for name in names
+        }
+
     def ensure_textures(self) -> None:
         GL = _get_gl()
+        self._compile_yuv_shader()
         for i in range(2):
             if self._textures[i]:
                 continue
-            tex = int(GL.glGenTextures(1))
-            GL.glBindTexture(GL.GL_TEXTURE_2D, tex)
-            GL.glTexImage2D(
-                GL.GL_TEXTURE_2D, 0, GL.GL_RGB8,
-                self.vid_w, self.vid_h, 0,
-                GL.GL_RGB, GL.GL_UNSIGNED_BYTE, None,
-            )
-            GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
-            GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR)
-            GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE)
-            GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE)
-            GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
-            self._textures[i] = tex
+            if self.pixel_format == "RGB":
+                self._textures[i] = [self._allocate_texture(
+                    self.vid_w, self.vid_h, GL.GL_RGB8, GL.GL_RGB, True
+                )]
+            elif self.pixel_format == "YUYV":
+                self._textures[i] = [self._allocate_texture(
+                    self.vid_w // 2, self.vid_h,
+                    GL.GL_RGBA8, GL.GL_RGBA, True,
+                )]
+            else:
+                self._textures[i] = [
+                    self._allocate_texture(
+                        self.vid_w, self.vid_h, GL.GL_R8, GL.GL_RED, True
+                    ),
+                    self._allocate_texture(
+                        self.vid_w // 2, self.vid_h // 2,
+                        GL.GL_RG8, GL.GL_RG, True,
+                    ),
+                ]
 
     def close(self) -> None:
         GL = _get_gl()
         for i in range(2):
-            if self._textures[i]:
+            for tex in self._textures[i]:
                 try:
-                    GL.glDeleteTextures(1, [self._textures[i]])
+                    GL.glDeleteTextures(1, [tex])
                 except Exception:
                     pass
-                self._textures[i] = 0
+            self._textures[i] = []
+        if self._program:
+            try:
+                GL.glDeleteProgram(self._program)
+            except Exception:
+                pass
+            self._program = 0
 
     # -- per-eye frame source -----------------------------------------------
 
     def _frame_for_eye(self, view_index: int, state: RuntimeComfortState):
-        """Return (rgb_frame, texture_index) for the given eye."""
+        """Return ``(frame, texture_index, source_sequence)`` for one eye."""
         if self.test_card:
             if self._test_frames[view_index] is None:
                 self._test_frames[view_index] = _make_test_card(
                     view_index, self.vid_w, self.vid_h
                 )
-            return self._test_frames[view_index], view_index
+            return self._test_frames[view_index], view_index, -1
 
         if self.capture is None:
-            return None, 0
+            return None, 0, -1
 
-        left, right, seq, _t = self.capture.latest()
+        left, right, seq_left, seq_right = self.capture.latest()
 
         if state.mono_to_both_eyes:
-            return (left, 0)
+            return left, 0, seq_left
         if view_index == 0:
-            return (right, 1) if state.swap_eyes else (left, 0)
-        return (left, 0) if state.swap_eyes else (right, 1)
-
-    def _source_seq(self, tex_idx: int, state: RuntimeComfortState) -> int:
-        if self.test_card or self.capture is None:
-            return -1
-        if state.mono_to_both_eyes:
-            return self.capture.seqs()[0]
-        return self.capture.seqs()[tex_idx]
+            return (right, 1, seq_right) if state.swap_eyes else (
+                left, 0, seq_left
+            )
+        return (left, 0, seq_left) if state.swap_eyes else (
+            right, 1, seq_right
+        )
 
     # -- quad geometry ------------------------------------------------------
 
@@ -250,6 +388,93 @@ class VideoStereoRenderer:
 
         return x0, y0, x1, y1, u0, v0, u1, v1
 
+    def _upload_frame(self, frame, tex_idx: int) -> None:
+        """Upload RGB or raw YUV bytes without CPU color conversion."""
+        GL = _get_gl()
+        textures = self._textures[tex_idx]
+        GL.glActiveTexture(GL.GL_TEXTURE0)
+        GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, 1)
+
+        if self.pixel_format == "RGB":
+            GL.glBindTexture(GL.GL_TEXTURE_2D, textures[0])
+            GL.glTexSubImage2D(
+                GL.GL_TEXTURE_2D, 0, 0, 0,
+                self.vid_w, self.vid_h,
+                GL.GL_RGB, GL.GL_UNSIGNED_BYTE, frame,
+            )
+        elif self.pixel_format == "YUYV":
+            expected = self.vid_w * self.vid_h * 2
+            if len(frame) < expected:
+                raise ValueError(
+                    f"Short YUYV frame: {len(frame)} < {expected} bytes"
+                )
+            packed = np.frombuffer(frame, dtype=np.uint8, count=expected)
+            GL.glBindTexture(GL.GL_TEXTURE_2D, textures[0])
+            GL.glTexSubImage2D(
+                GL.GL_TEXTURE_2D, 0, 0, 0,
+                self.vid_w // 2, self.vid_h,
+                GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, packed,
+            )
+        else:
+            y_size = self.vid_w * self.vid_h
+            uv_size = y_size // 2
+            expected = y_size + uv_size
+            if len(frame) < expected:
+                raise ValueError(
+                    f"Short NV12 frame: {len(frame)} < {expected} bytes"
+                )
+            planes = np.frombuffer(frame, dtype=np.uint8, count=expected)
+            GL.glBindTexture(GL.GL_TEXTURE_2D, textures[0])
+            GL.glTexSubImage2D(
+                GL.GL_TEXTURE_2D, 0, 0, 0,
+                self.vid_w, self.vid_h,
+                GL.GL_RED, GL.GL_UNSIGNED_BYTE, planes[:y_size],
+            )
+            GL.glBindTexture(GL.GL_TEXTURE_2D, textures[1])
+            GL.glTexSubImage2D(
+                GL.GL_TEXTURE_2D, 0, 0, 0,
+                self.vid_w // 2, self.vid_h // 2,
+                GL.GL_RG, GL.GL_UNSIGNED_BYTE, planes[y_size:],
+            )
+
+        GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+        GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, 4)
+
+    def _bind_for_draw(self, tex_idx: int) -> None:
+        GL = _get_gl()
+        textures = self._textures[tex_idx]
+        GL.glActiveTexture(GL.GL_TEXTURE0)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, textures[0])
+
+        if self.pixel_format == "RGB":
+            GL.glEnable(GL.GL_TEXTURE_2D)
+            return
+
+        GL.glUseProgram(self._program)
+        if self.pixel_format == "YUYV":
+            GL.glUniform1i(self._uniforms["u_yuyv"], 0)
+            GL.glUniform1f(self._uniforms["u_video_width"], float(self.vid_w))
+        else:
+            GL.glUniform1i(self._uniforms["u_y"], 0)
+            GL.glActiveTexture(GL.GL_TEXTURE1)
+            GL.glBindTexture(GL.GL_TEXTURE_2D, textures[1])
+            GL.glUniform1i(self._uniforms["u_uv"], 1)
+            GL.glActiveTexture(GL.GL_TEXTURE0)
+
+    def _unbind_after_draw(self) -> None:
+        GL = _get_gl()
+        if self.pixel_format == "RGB":
+            GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+            GL.glDisable(GL.GL_TEXTURE_2D)
+            return
+
+        if self.pixel_format == "NV12":
+            GL.glActiveTexture(GL.GL_TEXTURE1)
+            GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+        GL.glActiveTexture(GL.GL_TEXTURE0)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+        GL.glUseProgram(0)
+
     # -- render -------------------------------------------------------------
 
     def render_eye(self, view_index: int, state: RuntimeComfortState,
@@ -267,7 +492,7 @@ class VideoStereoRenderer:
         calib_x = calib_left_x if view_index == 0 else calib_right_x
         calib_y = calib_left_y if view_index == 0 else calib_right_y
 
-        rgb, tex_idx = self._frame_for_eye(view_index, state)
+        frame, tex_idx, src_seq = self._frame_for_eye(view_index, state)
 
         GL.glDisable(GL.GL_DEPTH_TEST)
         GL.glEnable(GL.GL_SCISSOR_TEST)
@@ -275,27 +500,16 @@ class VideoStereoRenderer:
         GL.glClearColor(0.02, 0.02, 0.02, 1.0)
         GL.glClear(GL.GL_COLOR_BUFFER_BIT)
 
-        if rgb is None:
+        if frame is None:
             return
 
-        tex = self._textures[tex_idx]
-        if not tex:
+        if not self._textures[tex_idx]:
             return
-
-        src_seq = self._source_seq(tex_idx, state)
 
         upload_ms = 0.0
         if self._tex_seq[tex_idx] != src_seq:
             t_up = time.perf_counter()
-            GL.glBindTexture(GL.GL_TEXTURE_2D, tex)
-            GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, 1)
-            GL.glTexSubImage2D(
-                GL.GL_TEXTURE_2D, 0, 0, 0,
-                self.vid_w, self.vid_h,
-                GL.GL_RGB, GL.GL_UNSIGNED_BYTE, rgb,
-            )
-            GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, 4)
-            GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
+            self._upload_frame(frame, tex_idx)
             self._tex_seq[tex_idx] = src_seq
             upload_ms = (time.perf_counter() - t_up) * 1000.0
 
@@ -311,8 +525,7 @@ class VideoStereoRenderer:
         GL.glPushMatrix()
         GL.glLoadIdentity()
 
-        GL.glEnable(GL.GL_TEXTURE_2D)
-        GL.glBindTexture(GL.GL_TEXTURE_2D, tex)
+        self._bind_for_draw(tex_idx)
         GL.glColor3f(1.0, 1.0, 1.0)
         GL.glBegin(GL.GL_QUADS)
         GL.glTexCoord2f(u0, v0)
@@ -324,8 +537,7 @@ class VideoStereoRenderer:
         GL.glTexCoord2f(u0, v1)
         GL.glVertex2f(x0, y1)
         GL.glEnd()
-        GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
-        GL.glDisable(GL.GL_TEXTURE_2D)
+        self._unbind_after_draw()
 
         GL.glMatrixMode(GL.GL_PROJECTION)
         GL.glPopMatrix()
@@ -350,8 +562,12 @@ def _print_state(renderer: VideoStereoRenderer, comfort: RuntimeComfortState,
         seq_l, seq_r = capture.seqs()
         cam = f"L{seq_l:5d} R{seq_r:5d}"
     timeouts = capture_stats.get("timeouts", [0, 0])
+    drops = capture_stats.get("driver_drops", [0, 0])
+    copy_ms = capture_stats.get("copy_ms", [0.0, 0.0])
     print(
         f"\r[LIVE] {cam}  DT={wall_dt:4.2f}s  TO={timeouts[0]}/{timeouts[1]}  "
+        f"DROP={drops[0]}/{drops[1]}  "
+        f"COPY={copy_ms[0]:4.1f}/{copy_ms[1]:4.1f}ms  "
         f"FIT={renderer.fit:<10} "
         f"ZOOM={comfort.zoom:.2f}  "
         f"SF={comfort.scene_farther_px:+.1f}  "
@@ -511,8 +727,15 @@ def main() -> int:
                 flip_v=args.flip_v,
                 test_card=args.test_card,
                 capture=capture,
+                fourcc=args.fourcc,
             )
             renderer.ensure_textures()
+            print(
+                f"[INFO] Video conversion path: {renderer.pixel_format} "
+                f"GPU fragment shader"
+                if renderer.pixel_format != "RGB"
+                else "[INFO] Video conversion path: RGB test-card texture"
+            )
 
             last_frame_ts = time.perf_counter()
             for _frame_index, frame_state in enumerate(s.frame_loop()):

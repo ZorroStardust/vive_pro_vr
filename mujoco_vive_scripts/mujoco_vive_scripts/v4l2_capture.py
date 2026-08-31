@@ -5,10 +5,11 @@ implements the standard V4L2 MMAP pipeline (REQBUFS -> QUERYBUF -> mmap ->
 QBUF -> STREAMON -> DQBUF/QBUF loop) with ctypes/select, matching the
 repo's dependency-light ctypes style.
 
-``StereoCapture`` runs one daemon thread per device.  Each thread converts
-the raw frame to RGB with precomputed LUTs and publishes it to a
-thread-safe ``latest`` slot; the renderer polls ``latest()`` on its own
-schedule, so capture pacing and display pacing are decoupled.
+``StereoCapture`` runs one daemon thread per device.  Each thread copies the
+newest raw YUV frame, immediately returns the MMAP buffer to the driver, and
+publishes the immutable bytes to a thread-safe ``latest`` slot.  YUV to RGB
+conversion belongs in the renderer's GPU shader; keeping it out of these
+threads prevents two 1080p60 NumPy conversions from starving control loops.
 """
 
 from __future__ import annotations
@@ -282,7 +283,7 @@ class V4L2Device:
     # -- streaming ----------------------------------------------------------
 
     def dequeue(self, timeout_s: float = 0.5):
-        """Block up to *timeout_s* for a frame; return (index, bytesused) or None."""
+        """Return ``(index, bytesused, kernel_sequence)`` or ``None``."""
         fd = self._fd
         if fd is None:
             return None
@@ -294,7 +295,7 @@ class V4L2Device:
         buf.memory = V4L2_MEMORY_MMAP
         _ioctl(fd, VIDIOC_DQBUF, buf)
         self._queued.discard(buf.index)
-        return buf.index, buf.bytesused
+        return buf.index, buf.bytesused, buf.sequence
 
     def queue(self, index: int) -> None:
         buf = _V4L2Buffer()
@@ -304,7 +305,8 @@ class V4L2Device:
         _ioctl(self._fd, VIDIOC_QBUF, buf)
         self._queued.add(index)
 
-    def frame(self, index: int, bytesused: int) -> memoryview:
+    def frame(self, index: int, bytesused: int) -> bytes:
+        """Copy one MMAP buffer so it can be queued back to V4L2 immediately."""
         return self._maps[index][:bytesused]
 
     def convert(self, frame, width: int, height: int) -> np.ndarray:
@@ -348,8 +350,8 @@ def _ioctl(fd: int, request: int, arg) -> None:
 class StereoCapture:
     """Two-threaded capture of left/right endoscope feeds.
 
-    Each device thread runs a DQBUF/convert/QBUF loop and publishes the
-    latest RGB frame to a thread-safe slot.  Devices that fail to open (or
+    Each device thread runs a DQBUF/copy/QBUF loop and publishes the latest
+    raw YUV frame to a thread-safe slot.  Devices that fail to open (or
     drop mid-stream) are retried with backoff and reported via ``stats()``.
     """
 
@@ -363,7 +365,7 @@ class StereoCapture:
         self._fourcc = fourcc
 
         self._devices: list[V4L2Device | None] = [None, None]
-        self._latest: list[np.ndarray | None] = [None, None]
+        self._latest: list[bytes | None] = [None, None]
         self._seq: list[int] = [0, 0]
         self._t: list[float] = [0.0, 0.0]
         self._frames: list[int] = [0, 0]
@@ -381,6 +383,14 @@ class StereoCapture:
         self._last_dq_ts: list[float] = [0.0, 0.0]
         self._max_gap: list[float] = [0.0, 0.0]
         self._gap_events: list[tuple[float, int, float, int]] = []
+        self._kernel_seq: list[int | None] = [None, None]
+        self._kernel_stride: list[int | None] = [None, None]
+        self._driver_drops: list[int] = [0, 0]
+        self._copy_ms: list[float] = [0.0, 0.0]
+
+    @property
+    def fourcc(self) -> str:
+        return self._fourcc
 
     def start(self) -> None:
         self._stop.clear()
@@ -407,9 +417,9 @@ class StereoCapture:
         self._threads = []
 
     def latest(self):
-        """Return (left_rgb, right_rgb, seq, wall_t) of the newest frame pair."""
+        """Atomically return ``(left_yuv, right_yuv, left_seq, right_seq)``."""
         with self._lock:
-            return self._latest[0], self._latest[1], self._seq[0], self._t[0]
+            return self._latest[0], self._latest[1], self._seq[0], self._seq[1]
 
     def seqs(self) -> tuple[int, int]:
         """Return the published-frame sequence numbers (left, right)."""
@@ -425,6 +435,9 @@ class StereoCapture:
                 "seq": list(self._seq),
                 "timeouts": list(self._timeouts),
                 "max_gap": list(self._max_gap),
+                "driver_drops": list(self._driver_drops),
+                "kernel_stride": list(self._kernel_stride),
+                "copy_ms": list(self._copy_ms),
             }
 
     def drain_gap_events(self) -> list[tuple[float, int, float, int]]:
@@ -434,12 +447,27 @@ class StereoCapture:
             self._gap_events.clear()
             return events
 
-    def _publish(self, i: int, rgb: np.ndarray) -> None:
+    def _publish(self, i: int, raw: bytes, kernel_seq: int,
+                 copy_ms: float) -> None:
         with self._lock:
-            self._latest[i] = rgb
+            previous = self._kernel_seq[i]
+            if previous is not None:
+                delta = (kernel_seq - previous) & 0xFFFFFFFF
+                if 0 < delta < 0x80000000:
+                    stride = self._kernel_stride[i]
+                    if stride is None or delta < stride:
+                        # Some UVC devices increment their sequence by two for
+                        # every delivered progressive frame.  Learn that normal
+                        # stride instead of reporting every frame as a drop.
+                        self._kernel_stride[i] = delta
+                    elif delta > stride:
+                        self._driver_drops[i] += max(1, delta // stride - 1)
+            self._kernel_seq[i] = kernel_seq
+            self._latest[i] = raw
             self._seq[i] += 1
             self._t[i] = time.perf_counter()
             self._frames[i] += 1
+            self._copy_ms[i] = copy_ms
 
     def _loop(self, i: int) -> None:
         while not self._stop.is_set():
@@ -462,6 +490,8 @@ class StereoCapture:
                 self._status[i] = f"streaming {dev.width}x{dev.height} {self._fourcc}"
             self._last_dq_ts[i] = 0.0
             self._timeouts_since_dq[i] = 0
+            self._kernel_seq[i] = None
+            self._kernel_stride[i] = None
 
             while not self._stop.is_set():
                 try:
@@ -471,7 +501,7 @@ class StereoCapture:
                             self._timeouts[i] += 1
                             self._timeouts_since_dq[i] += 1
                         continue
-                    index, bytesused = dq
+                    index, bytesused, kernel_seq = dq
                     now = time.perf_counter()
                     prev = self._last_dq_ts[i]
                     if prev > 0.0:
@@ -487,12 +517,29 @@ class StereoCapture:
                                     del self._gap_events[:32]
                     self._last_dq_ts[i] = now
                     self._timeouts_since_dq[i] = 0
-                    rgb = dev.convert(dev.frame(index, bytesused), dev.width, dev.height)
+                    expected = (
+                        dev.width * dev.height * 2
+                        if self._fourcc == "YUYV"
+                        else dev.width * dev.height * 3 // 2
+                    )
+                    if bytesused < expected:
+                        try:
+                            dev.queue(index)
+                        except OSError:
+                            break
+                        raise RuntimeError(
+                            f"{dev.path}: short {self._fourcc} frame "
+                            f"({bytesused} < {expected} bytes)"
+                        )
+
+                    t_copy = time.perf_counter()
+                    raw = dev.frame(index, expected)
+                    copy_ms = (time.perf_counter() - t_copy) * 1000.0
                     try:
                         dev.queue(index)
                     except OSError:
                         break
-                    self._publish(i, rgb)
+                    self._publish(i, raw, kernel_seq, copy_ms)
                 except OSError as exc:
                     with self._lock:
                         self._status[i] = f"error: {exc}"
