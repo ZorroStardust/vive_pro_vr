@@ -5,6 +5,8 @@
 - `mujoco_vive_scripts/` — primary Python package. Active development lives here.
 - `script_test/` — shell scripts for raw Monado/VIVE TTY testing, diagnostics, and log snapshots.
 - `stage1.md` — debug journal documenting the full hardware/software setup chain.
+- `mujoco_vive_scripts/live_video_teleop_stutter_analysis.md` — resolved live-video +
+  teleop stutter incident, including rejected Omega/USB hypothesis and GPU fix.
 
 No CI, no tests, no lint config. The repo is a workspace for prototyping, not a shipped library. Git is used locally for history; no remote is configured.
 
@@ -44,12 +46,22 @@ pixi run install-system-deps
 | OpenXR MuJoCo stereo (comfort controls) | `pixi run xr-mujoco-opengl` |
 | OpenXR crosshair calibration tool | `pixi run xr-crosshair` |
 | OpenXR surgical robot stereo preview | `pixi run xr-surgical` |
-| Endoscope live stereo video → HMD | `pixi run xr-live-video` (auto-detects the two Cypress `04b4:00f9` capture boxes, skipping the VIVE HMD camera; override with `--left-dev/--right-dev`, 1920x1080@60; `--fourcc auto` (default) picks YUYV vs NV12 from the shared USB link budget — a 5G hub forces NV12) |
+| Endoscope live stereo video → HMD | `pixi run xr-live-video` (auto-detects the two Cypress `04b4:00f9` capture boxes, skipping the VIVE HMD camera; override with `--left-dev/--right-dev`, 1920x1080@60; `--fourcc auto` (default) picks YUYV vs NV12 from the shared USB link budget — a 5G hub forces NV12; YUV→RGB runs in a GPU shader) |
 | Endoscope live video, desktop window | `pixi run xr-live-video-screen` |
 | Endoscope GL path test (no cameras) | `pixi run xr-live-video-testcard` |
 | USB capture-box recovery (power-cycle empty hubs, needs sudo) | `pixi run usb-recover` |
 | Shell in pixi env | `pixi shell` |
 | Full TTY direct-mode pipeline | `~/vive_stage1_tmux.sh` (from `script_test/`) |
+
+## Resolved issue: live video + teleop stutter
+
+The former conclusion that an Omega device periodically disturbed the shared
+xHCI controller was disproved.  The actual cause was two CPU NumPy YUV→RGB
+conversions at 1920x1080@60, which starved both rendering and CANFD scheduling.
+Commit `f1d0d53` publishes raw YUV after immediately returning the V4L2 buffer
+and performs YUYV/NV12 conversion in the GPU fragment shader.  Do not suspend
+or disconnect Omega devices as a workaround.  See
+`mujoco_vive_scripts/live_video_teleop_stutter_analysis.md` for the evidence.
 
 ## Hardware/OS invariants
 

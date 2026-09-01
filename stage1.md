@@ -1076,3 +1076,16 @@ Stage 1D: MuJoCo 双目相机画面接入 OpenXR        [后续]
 Stage 2: 加入内镜圆形视场 / 畸变 / 暗角          [后续]
 Stage 3: 优化 GPU texture path / 低延迟           [后续]
 ```
+
+---
+
+## 20. 后续事件记录：双路 live video + teleop 卡顿（已解决）
+
+2026-08-27 至 2026-09-01 排查了双路 1920×1080@60 实时内窥镜视频与
+teleop 同时运行时的画面及 CANFD 调度卡顿。最终根因是采集线程中的双路 NumPy
+YUV→RGB 转换，不是 Omega、力反馈、USB/xHCI、HMD 或 Monado。
+
+修复后改为发布原始 YUV，并在 GPU fragment shader 中转换；真实联合运行确认
+卡顿消失。完整实验矩阵、错误归因复盘、性能数据和修复结构见：
+
+`mujoco_vive_scripts/live_video_teleop_stutter_analysis.md`
